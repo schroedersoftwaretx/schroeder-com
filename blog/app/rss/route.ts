@@ -1,4 +1,4 @@
-import { baseUrl } from 'app/sitemap'
+import { baseUrl, siteDescription, siteName } from 'app/site'
 import { getBlogPosts } from 'app/blog/utils'
 
 export async function GET() {
@@ -27,9 +27,9 @@ export async function GET() {
   const rssFeed = `<?xml version="1.0" encoding="UTF-8" ?>
   <rss version="2.0">
     <channel>
-        <title>My Portfolio</title>
+        <title>${siteName}</title>
         <link>${baseUrl}</link>
-        <description>This is my portfolio RSS feed</description>
+        <description>${siteDescription}</description>
         ${itemsXml}
     </channel>
   </rss>`

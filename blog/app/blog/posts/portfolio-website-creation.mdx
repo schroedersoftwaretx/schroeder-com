@@ -1,0 +1,49 @@
+---
+title: 'Building a Portfolio Website'
+publishedAt: '2026-03-31'
+summary: 'How I made and deployed a website to host my resume and computer science blogs.'
+---
+
+<Lead>
+  Hello! Welcome to the first iteration of my portfolio website. I built this website as a way to showcase my projects and document my professional experiences.
+</Lead>
+
+---
+
+When making my resume, I always felt as if something was missing. There is only so much you can fit on a single page, even the magic of LaTeX formatting. Some of the most pivotal parts of my development as a programmer, such as the design process and debugging sessions, were all condensed into a single bullet point. Beyond the limited space of a printed paper, I felt traditional resumes were deficient when trying to outline my actual work. A resume is okay at showing the outcome of a project, but it is inadequate at describing the processes where the real learning happens. Thus, I decided it would be a great idea to make a website dedicated to showcasing that which can't be fit on a page.
+
+---
+
+There were many things to consider when I sat down and began planning what I wanted from this webpage. One of the things that most developers or professionals struggle with is scope. Before writing any code, I set out on clearly defining the problem and purpose of my project. As described, my issue was that I felt my resume didn't properly showcase my work or what value I could bring to a team. This meant that my main goal would be to create a platform that could better describe my work and communicate the value I could bring to a team.
+
+Another important consideration when planning was my target audience. Seeing as my issue revolved around my frustrations with a traditional resume, my first target audience would be those who would typically view my resume. Since the time of recruiters and interviewers is limited and valuable, I wanted to keep the fluff to a minimum. I decided that my website would have a very simplistic design with direct links to my resume, my github, my linkedin, and more detail on any projects recruiters may find to be interesting or relevant. It was my hope that keeping things simple would create a smooth experience for my users. Rather than wasting time navigating through complicated UI or my paper resume, recruiters could quickly access my work and spend more time viewing my projects.
+
+<Callout title="On keeping things simple">
+  It was my hope that keeping things simple would create a smooth experience for my users. Rather than wasting time navigating through complicated UI or my paper resume, recruiters could quickly access my work and spend more time viewing my projects.
+</Callout>
+
+Finally, I wanted something that represented me. Beyond my love for computer science, I love the opportunity to be creative. I love explaining ideas and I like making content for other people to see. I felt that having some blog functionality would be a great way for me to show the detail in my projects that can't be displayed in my resume. Besides being a great way for me to market myself, I felt that blogs would be a great creative outlet that would allow me to further reflect and learn from my work.
+
+---
+
+With the scope created, it was time to start thinking about the technical design. Though I do have experience building websites from my time in Web Technologies and Advanced Software Engineering, I opted to use a template that I found on github created by Vercel. Link here: [https://github.com/vercel/examples/tree/main/solutions/blog](https://github.com/vercel/examples/tree/main/solutions/blog).
+
+After browsing many different templates, I settled for this one as it had many of the traits I was looking for. First, the use of next.js was really appealing to me. I have been trying to learn react for a recent project in my senior design class, and getting some experience using next.js would have been very useful for that concurrent project. One of the key advantages of using Next.js is its support for server-side rendering (SSR) and static site generation (SSG). Since my site is primarily content-driven, I can pre-render pages at build time and serve optimized HTML to users. This allows me to lower client-side work, improve load performance, and create a smoother user experience. Having my blog posts pre-rendered, even if they are simple to begin with, helps with giving a better experience to those using my website.
+
+The template also introduced me to MDX for making blog descriptions. Using markdown would make it easier for me to write my blog posts, and MDX would allow me to add some more customization with react components in the future. I've seen some really great applications of this from interactive graphs to mini physics simulations. This was something I was really interested in using sometime in the future.
+
+An interesting change was the use of Tailwind CSS rather than bootstrap like I am used to. I am much more familiar with backend design, and so I haven't had any experience using tailwind prior to breaking this template apart. However, I had a really positive first experience with tailwind when doing minor tweaks on some of the elements I didn't like. I made some simple changes with how the dates are displayed next to blog posts, making the template slightly lighter in dark mode and slightly darker in light mode, made a new tab to hold only my resume, and made some new footer links to some of my important links.
+
+---
+
+This project is the beginning of something that I plan to continuously work on. I am excited to keep learning the technologies behind this website so I can keep improving. The website is simple at the moment, but the design has been intentional and there is a great foundation to build upon. I am most excited about the opportunity for me to revisit some of my older projects and document their story in greater detail. I can't wait to get started and turn this website into a living record of my progress.
+
+Thank you for reading!
+
+<Signature>
+
+Sean Aidan O&apos;Toole
+
+3/31/2026
+
+</Signature>

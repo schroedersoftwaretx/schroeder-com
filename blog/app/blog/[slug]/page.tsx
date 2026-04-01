@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { CustomMDX } from 'app/components/mdx'
 import { formatDate, getBlogPosts } from 'app/blog/utils'
-import { baseUrl } from 'app/sitemap'
+import { baseUrl, siteName } from 'app/site'
 
 type PageProps = {
   params: Promise<{ slug: string }>
@@ -83,7 +83,7 @@ export default async function Blog({ params }: PageProps) {
             url: `${baseUrl}/blog/${post.slug}`,
             author: {
               '@type': 'Person',
-              name: 'My Portfolio',
+              name: siteName,
             },
           }),
         }}

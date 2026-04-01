@@ -64,6 +64,43 @@ function slugify(str) {
     .replace(/\-\-+/g, '-') // Replace multiple - with single -
 }
 
+function Lead({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="not-prose my-8 first:mt-0 [&_p]:text-lg [&_p]:leading-relaxed [&_p]:text-neutral-700 dark:[&_p]:text-neutral-200 [&_p]:font-medium">
+      {children}
+    </div>
+  )
+}
+
+function Callout({
+  title,
+  children,
+}: {
+  title?: string
+  children: React.ReactNode
+}) {
+  return (
+    <aside className="not-prose my-8 rounded-xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-neutral-50 p-5 shadow-sm dark:border-sky-900/50 dark:from-sky-950/40 dark:via-neutral-950 dark:to-neutral-950">
+      {title ? (
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+          {title}
+        </p>
+      ) : null}
+      <div className="text-[0.95rem] leading-relaxed text-neutral-700 dark:text-neutral-300 [&_a]:font-medium [&_a]:text-sky-800 [&_a]:underline [&_a]:underline-offset-2 dark:[&_a]:text-sky-400">
+        {children}
+      </div>
+    </aside>
+  )
+}
+
+function Signature({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="not-prose mt-14 border-t border-neutral-200 pt-8 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+      {children}
+    </div>
+  )
+}
+
 function createHeading(level) {
   const Heading = ({ children }) => {
     let slug = slugify(children)
@@ -97,6 +134,9 @@ let components = {
   a: CustomLink,
   code: Code,
   Table,
+  Lead,
+  Callout,
+  Signature,
 }
 
 export function CustomMDX(props) {
