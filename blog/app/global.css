@@ -34,8 +34,9 @@ html {
 }
 
 .prose .anchor {
-  @apply absolute invisible no-underline;
-
+  position: absolute;
+  visibility: hidden;
+  text-decoration: none;
   margin-left: -1em;
   padding-right: 0.5em;
   width: 80%;
@@ -44,75 +45,139 @@ html {
 }
 
 .anchor:hover {
-  @apply visible;
+  visibility: visible;
 }
 
 .prose a {
-  @apply underline transition-all decoration-neutral-300 dark:decoration-neutral-600 underline-offset-2 decoration-[0.1em];
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 0.1em;
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  text-decoration-color: #d4d4d4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose a {
+    text-decoration-color: #525252;
+  }
 }
 
 .prose .anchor:after {
-  @apply text-neutral-300 dark:text-neutral-700;
+  color: #d4d4d4;
   content: '#';
 }
 
+@media (prefers-color-scheme: dark) {
+  .prose .anchor:after {
+    color: #404040;
+  }
+}
+
 .prose *:hover > .anchor {
-  @apply visible;
+  visibility: visible;
 }
 
 .prose pre {
-  @apply bg-white/70 dark:bg-neutral-900 rounded-lg overflow-x-auto border border-neutral-200/70 dark:border-neutral-900 py-2 px-3 text-sm;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(229 229 229 / 0.7);
+  background-color: rgb(255 255 255 / 0.7);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose pre {
+    background-color: #171717;
+    border-color: #171717;
+  }
 }
 
 .prose code {
-  @apply px-1 py-0.5 rounded-lg;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.5rem;
 }
 
 .prose pre code {
-  @apply p-0;
+  padding: 0;
   border: initial;
   line-height: 1.5;
 }
 
 .prose code span {
-  @apply font-medium;
+  font-weight: 500;
 }
 
 .prose img {
   /* Don't apply styles to next/image */
-  @apply m-0;
+  margin: 0;
 }
 
 .prose p {
-  @apply my-4 text-neutral-700 dark:text-neutral-200;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  color: #404040;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose p {
+    color: #e5e5e5;
+  }
 }
 
 .prose h1 {
-  @apply text-4xl font-medium tracking-tight mt-6 mb-2;
+  font-size: 2.25rem;
+  line-height: 2.5rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .prose h2 {
-  @apply text-xl font-medium tracking-tight mt-6 mb-2;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .prose h3 {
-  @apply text-xl font-medium tracking-tight mt-6 mb-2;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .prose h4 {
-  @apply text-lg font-medium tracking-tight mt-6 mb-2;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .prose strong {
-  @apply font-medium;
+  font-weight: 500;
 }
 
 .prose ul {
-  @apply list-disc pl-6;
+  list-style-type: disc;
+  padding-left: 1.5rem;
 }
 
 .prose ol {
-  @apply list-decimal pl-6;
+  list-style-type: decimal;
+  padding-left: 1.5rem;
 }
 
 .prose > :first-child {
