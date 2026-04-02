@@ -12,5 +12,5 @@ export const baseUrl = (
     ? explicitUrl
     : process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : 'https://schroeder.com'
+      : 'https://schrodersoftware.com'
 ) as string

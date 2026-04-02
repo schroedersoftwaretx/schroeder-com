@@ -1,25 +1,39 @@
-# schroeder-com
+# schrodersoftware.com
 
-The Next.js site lives in **`blog/`** (not the repository root).
+Personal site: portfolio, resume, and blog (Next.js App Router, MDX, Tailwind).
 
-## Deploy on Vercel (avoids `404 NOT_FOUND`)
+## Local development
 
-If the Vercel project root is the repo root, there is **no** `package.json` or Next app there, so the deployment may not serve your site and you can see **platform `NOT_FOUND`** (not your Next.js `not-found` page).
+```bash
+pnpm install
+pnpm dev
+```
 
-1. Open the project on [Vercel](https://vercel.com) → **Settings** → **General**.
-2. Set **Root Directory** to **`blog`** (click Edit, choose the `blog` folder, save).
-3. **Redeploy** the latest commit (**Deployments** → … → Redeploy).
+Open [http://localhost:3000](http://localhost:3000).
 
-Then open the deployment URL from the dashboard (**Visit**), or your assigned `*.vercel.app` hostname.
+## Production URL
 
-If **`https://<project>.vercel.app`** still shows **Vercel’s** `404 NOT_FOUND` (with a `cle1::…` id) even with Root Directory = `blog`:
+Canonical site URL and metadata use `NEXT_PUBLIC_SITE_URL` when set (no trailing slash). The default in `app/site.ts` is **`https://schrodersoftware.com`**.
 
-1. **Deployments → Production** — Is there a **Ready** deployment? If every production build **Error**s, the production URL may not serve your app. Open **Build Logs** and fix the error.
-2. **Settings → Git → Production Branch** — Must match the branch you push to (e.g. **`main`**). If Vercel watches **`master`** but you only use **`main`**, production never updates.
-3. **Environment variables** — Do **not** set `NEXT_PUBLIC_SITE_URL` to an empty value. Leave it unset or set to a full URL (e.g. `https://schroeder-com.vercel.app` or your custom domain).
+## Build
 
-### Optional env
+The app uses **`output: 'export'`** so `pnpm build` writes a static site to **`out/`** (includes **`out/index.html`**) for hosts like **Hostinger** that expect static files.
 
-In **Settings → Environment Variables**, set `NEXT_PUBLIC_SITE_URL` to your production URL (no trailing slash), e.g. `https://your-domain.com` or `https://schroeder-com.vercel.app`.
+```bash
+pnpm build
+```
 
-Local development: see `blog/README.md`.
+- **Preview the static output locally:** `npx serve out` (or any static file server pointed at `out/`).
+- **`pnpm start`** is for running the Node server in non-export mode; with static export, deploy **`out/`** or use `serve` as above.
+
+## Hostinger (or any static host)
+
+1. Run `pnpm build` on your machine (or in CI).
+2. Upload **everything inside** the **`out/`** folder into your hosting **document root** (often `public_html`). You should see **`index.html`** at the root of what you upload.
+3. Set **`NEXT_PUBLIC_SITE_URL`** to your live URL before building so RSS, sitemap, and metadata use the correct domain (or edit `app/site.ts` / `scripts/generate-rss.mjs` defaults).
+
+RSS is generated as **`public/rss.xml`** during **`prebuild`** and copied into **`out/rss.xml`**.
+
+## Vercel
+
+Use the **repository root** as the project root (leave **Root Directory** empty or set to `.`). Install: **`pnpm install`**, build: **`pnpm build`**. With `output: 'export'`, set **Output Directory** to **`out`** if the dashboard asks for it.

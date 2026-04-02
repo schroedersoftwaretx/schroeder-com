@@ -28,9 +28,11 @@ export async function generateMetadata({ params }: PageProps) {
     summary: description,
     image,
   } = post.metadata
-  let ogImage = image
-    ? image
-    : `${baseUrl}/og?title=${encodeURIComponent(title)}`
+  const absoluteImage = image
+    ? image.startsWith('http')
+      ? image
+      : `${baseUrl}${image}`
+    : undefined
 
   return {
     title,
@@ -41,17 +43,17 @@ export async function generateMetadata({ params }: PageProps) {
       type: 'article',
       publishedTime,
       url: `${baseUrl}/blog/${post.slug}`,
-      images: [
-        {
-          url: ogImage,
-        },
-      ],
+      ...(absoluteImage
+        ? {
+            images: [{ url: absoluteImage }],
+          }
+        : {}),
     },
     twitter: {
-      card: 'summary_large_image',
+      card: absoluteImage ? 'summary_large_image' : 'summary',
       title,
       description,
-      images: [ogImage],
+      ...(absoluteImage ? { images: [absoluteImage] } : {}),
     },
   }
 }
@@ -77,9 +79,13 @@ export default async function Blog({ params }: PageProps) {
             datePublished: post.metadata.publishedAt,
             dateModified: post.metadata.publishedAt,
             description: post.metadata.summary,
-            image: post.metadata.image
-              ? `${baseUrl}${post.metadata.image}`
-              : `/og?title=${encodeURIComponent(post.metadata.title)}`,
+            ...(post.metadata.image
+              ? {
+                  image: post.metadata.image.startsWith('http')
+                    ? post.metadata.image
+                    : `${baseUrl}${post.metadata.image}`,
+                }
+              : {}),
             url: `${baseUrl}/blog/${post.slug}`,
             author: {
               '@type': 'Person',

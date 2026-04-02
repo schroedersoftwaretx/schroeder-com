@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sean Aidan O'Toole</title>
+    <link>https://schrodersoftware.com</link>
+    <description>Software engineer and data scientist — portfolio, blog, and resume.</description>
+    <item>
+      <title>Building a Portfolio Website</title>
+      <link>https://schrodersoftware.com/blog/portfolio-website-creation</link>
+      <description>How I made and deployed a website to host my resume and computer science blogs.</description>
+      <pubDate>Tue, 31 Mar 2026 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
