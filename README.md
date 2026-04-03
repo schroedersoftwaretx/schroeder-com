@@ -1,6 +1,7 @@
 # schrodersoftware.com
 
 Personal site: portfolio, resume, and blog (Next.js App Router, MDX, Tailwind).
+Based off of a vercel template I found here: https://github.com/vercel/examples/tree/main/solutions/blog
 
 ## Local development
 
