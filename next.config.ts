@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  transpilePackages: ['next-mdx-remote', 'recharts'],
 }
 
 export default nextConfig

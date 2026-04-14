@@ -203,11 +203,58 @@ input[type='email'] {
   appearance: none;
 }
 
+/* Default: allow horizontal scroll for wide tables outside prose */
 table {
   display: block;
   max-width: fit-content;
   overflow-x: auto;
   white-space: nowrap;
+}
+
+.prose table {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  white-space: normal;
+  font-size: 0.9375em;
+  line-height: 1.5;
+}
+
+.prose thead {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose thead {
+    border-bottom-color: #404040;
+  }
+}
+
+.prose th,
+.prose td {
+  border: 1px solid #e5e5e5;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose th,
+  .prose td {
+    border-color: #404040;
+  }
+}
+
+.prose th {
+  font-weight: 600;
+  background-color: #fafafa;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose th {
+    background-color: #262626;
+  }
 }
 
 .title {

@@ -1,0 +1,307 @@
+---
+title: "Finding Value in the Draft: A Data Science Approach to Fantasy Football"
+publishedAt: "2026-04-13"
+summary: "How I built a SQL database, wrote Python regression models, and used machine learning to find undervalued NFL players for the 2026 season — and what I learned when my models kept breaking."
+---
+
+# Finding Value in the Draft: A Data Science Approach to Fantasy Football
+
+*How I built a relational database, wrote Python regression models, and discovered that the first two models I tried were completely wrong — and what I learned from breaking them.*
+
+---
+
+## Why This Project Exists
+
+Every year, millions of people draft fantasy football teams based on rankings built from gut feeling, recency bias, and name recognition. I wanted to find out what a data-driven approach would look like — not because I think you can perfectly predict NFL outcomes, but because I wanted to practice real data engineering and machine learning on a domain I actually care about.
+
+This project ended up being one of the most educational things I've built. Not because the final model is perfect, but because I had to debug two broken models before arriving at one that actually made sense. That debugging process is the most important part of this post, and I want to walk through it honestly.
+
+**Everything here is built from real 2026 projection and ADP data from the Sleeper API.** No synthetic data, no toy examples.
+
+---
+
+## The Tech Stack
+
+Before getting into findings, here's what the full pipeline looks like:
+
+| Layer | Tools |
+|---|---|
+| Data storage | SQLite (relational database) |
+| Data access | SQL with multi-table JOINs |
+| Analysis environment | Jupyter Notebook |
+| Data manipulation | Pandas, NumPy |
+| Visualization | Matplotlib, Seaborn |
+| Machine learning | Scikit-learn (KMeans, IsotonicRegression, StandardScaler) |
+| Curve fitting | SciPy (linregress, curve_fit) |
+
+One thing worth noting: I deliberately chose SQLite over a flat CSV workflow. Using a relational database forced me to think carefully about schema design, primary keys, foreign key constraints, and JOIN logic — all skills that transfer directly to production data engineering work.
+
+---
+
+## The Database Schema
+
+The data lives in four relational tables:
+
+```sql
+CREATE TABLE players (
+  player_id   TEXT PRIMARY KEY,
+  full_name   TEXT,
+  position    TEXT,
+  team        TEXT,
+  age         INTEGER,
+  years_exp   INTEGER,
+  status      TEXT
+);
+
+CREATE TABLE season_projections (
+  player_id     TEXT PRIMARY KEY,
+  pts_ppr       REAL,
+  vorp_ppr      REAL,
+  rush_yd       REAL,
+  rec           REAL,
+  pass_yd       REAL,
+  -- ... 30+ additional stat columns
+  FOREIGN KEY (player_id) REFERENCES players(player_id)
+);
+
+CREATE TABLE adp (
+  player_id     TEXT PRIMARY KEY,
+  adp_ppr       REAL,
+  adp_half_ppr  REAL,
+  adp_std       REAL,
+  -- dynasty, rookie formats...
+  FOREIGN KEY (player_id) REFERENCES players(player_id)
+);
+```
+
+The `player_id` foreign key constraint is what makes the JOIN logic reliable. Without it, a typo in a player name would silently drop rows rather than throwing an error.
+
+A subtle but important detail: `season_projections.player_id` is also a `PRIMARY KEY`, meaning each player has exactly one projection row. This is a 1-to-1 relationship with the `players` table, which means JOINs between these tables will never produce duplicate rows — an important assumption for aggregation queries.
+
+---
+
+## The Two Key Metrics
+
+Everything in this analysis comes back to two numbers:
+
+**ADP (Average Draft Position)** — the market price. Where managers in real Sleeper leagues are actually drafting a player. Lower is better.
+
+**VORP (Value Over Replacement Player)** — the signal. How many more projected points a player generates compared to the baseline replacement at their position. A VORP of 0 means you could find an equivalent player off the waiver wire.
+
+The core question driving all the modeling: *given a player's ADP, how much VORP should we expect — and who is beating that expectation?*
+
+---
+
+## Step 1: Building Tiers with K-Means Clustering
+
+Before looking for individual value, I wanted to group players into meaningful tiers. The naive approach is to cut by round: round 1 = tier 1, round 2 = tier 2, and so on. The problem is that draft value doesn't fall off cleanly at pick 12. There are real value cliffs in the data, and they don't align with round boundaries.
+
+**K-Means clustering** lets the data find its own groupings. It's an unsupervised algorithm that assigns each player to one of *k* clusters by minimizing the distance between players and their cluster center. I used both ADP and VORP as inputs, normalized with `StandardScaler` so neither variable dominated just because of its scale.
+
+```python
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+scaler = StandardScaler()
+df_scaled = scaler.fit_transform(df[['adp_ppr', 'vorp_ppr']])
+
+kmeans = KMeans(n_clusters=8, random_state=42, n_init=10)
+df['Tier'] = kmeans.fit_predict(df_scaled)
+
+# Re-label so Tier 1 = best ADP
+tier_order = df.groupby('Tier')['adp_ppr'].mean().sort_values().index
+tier_map = {old: new + 1 for new, old in enumerate(tier_order)}
+df['Tier'] = df['Tier'].map(tier_map)
+```
+
+Here's the top 50 players plotted by ADP and VORP, colored by tier:
+
+<FantasyTop50TierScatter />
+
+*Each dot is a player. Color = tier. X-axis is reversed so earlier picks are on the right.*
+
+The tiers capture something that round-based cutoffs miss: **Ashton Jeanty and De'Von Achane (both ADP ~15-16) cluster with the elite tier despite being drafted well behind the consensus top 8.** Their VORP projections place them in the same neighborhood as the first-round elite, which the market isn't fully pricing in.
+
+---
+
+## Step 2: Finding Value — The Regression Journey
+
+This is where things got interesting, and where I made the most mistakes.
+
+The goal: for each player, calculate a *residual* — the difference between their actual VORP and the VORP we'd expect given their ADP. A large positive residual means the market is underpricing them. A large negative residual means the market is overpaying.
+
+To do that, I need a model that defines "expected VORP at a given ADP." I tried three approaches in order, and the first two broke in instructive ways.
+
+---
+
+### Attempt 1: Linear Regression
+
+The most natural starting point. Fit a straight line to ADP vs VORP, compute residuals as the vertical distance from each player to the line.
+
+```python
+from scipy import stats
+
+def calc_residuals_linear(group):
+    slope, intercept, _, _, _ = stats.linregress(group['adp_ppr'], group['vorp_ppr'])
+    group['expected_vorp'] = slope * group['adp_ppr'] + intercept
+    group['residual_linear'] = group['vorp_ppr'] - group['expected_vorp']
+    return group
+
+df = df.groupby('position', group_keys=False).apply(calc_residuals_linear)
+```
+
+**Why I ran this per position:** A WR's VORP is measured against other WRs, so comparing a WR residual to an RB residual directly doesn't make sense. Running the regression within each position group means the residuals reflect value relative to positional peers.
+
+**Why it broke:** Draft value doesn't fall off in a straight line. The drop from pick 1 to pick 10 is enormous. The drop from pick 80 to pick 90 is minimal. A straight line assumes a constant rate of decline across the entire draft, which means it systematically over-expects from early picks and under-expects from late picks.
+
+The result: the linear model was heavily biased toward Running Backs. Because RBs tend to cluster at lower ADP ranges where the linear model underestimates expected VORP, they systematically appeared to have higher-than-expected VORP — not because they're undervalued, but because the model's straight-line assumption was wrong.
+
+---
+
+### Attempt 2: Polynomial Fitting (Where Things Broke Badly)
+
+To capture the curve, I tried polynomial regression — first quadratic, then cubic. A polynomial can bend to follow the natural shape of the value dropoff.
+
+```python
+from scipy.optimize import curve_fit
+
+def poly_fit_3(x, a, b, c, d):
+    return a * x**3 + b * x**2 + c * x + d
+
+popt, _ = curve_fit(poly_fit_3, group['adp_ppr'], group['vorp_ppr'])
+group['expected_vorp_poly'] = poly_fit_3(group['adp_ppr'], *popt)
+```
+
+This looked promising at first. But when I checked the rankings it produced, something was clearly wrong:
+
+| Player | ADP | VORP | Poly Rank |
+|---|---|---|---|
+| Keon Coleman | 234.8 | -80.7 | **11th WR** |
+| Kyle Williams | 222.1 | -57.7 | **13th WR** |
+| Jaxon Smith-Njigba | 5.4 | 165.1 | **65th WR** |
+| CeeDee Lamb | 10.6 | 151.0 | **62nd WR** |
+
+A player with **-80 VORP ranked 11th at his position**. One of the best WRs in the league ranked 65th. This is complete nonsense — and understanding *why* it happened is the most important lesson of the whole project.
+
+**What went wrong:** This is a textbook case of **overfitting at the tails**. A cubic polynomial has enough degrees of freedom to chase the extreme values at both ends of your ADP range. At high ADP (200+), a handful of players with deeply negative VORP pulled the curve down steeply. The cubic fit dutifully followed them — which meant it then *expected* extremely negative VORP from late-round players. When late-round players only had *slightly* negative VORP, they looked like bargains by comparison.
+
+The key insight here: **a model that fits the data too closely in one region breaks everywhere else.** Polynomial fitting is powerful but dangerous without explicit constraints, especially when your data has meaningful outliers at the extremes.
+
+---
+
+### Attempt 3: Isotonic Regression (The Right Tool)
+
+After debugging two broken models, I stepped back and asked: what do I actually *know* to be true about this problem?
+
+One thing is always true in a fantasy draft: **a player drafted later should never be expected to outscore a player drafted earlier, on average.** That's not a statistical assumption — it's a logical constraint. If pick 50 was expected to outscore pick 10, rational managers would have already bid pick 50's price up to match.
+
+Isotonic regression enforces exactly this constraint. It fits a **monotonically decreasing staircase** to the data — meaning it can never go back up. No specific curve shape is assumed. It finds the best-fitting line that satisfies one rule: every step to the right must stay flat or go lower.
+
+```python
+from sklearn.isotonic import IsotonicRegression
+
+def calc_residuals_isotonic(group):
+    # Only fit on positive-VORP players to prevent late-round noise
+    # from distorting the curve for everyone else
+    fit_group = group[group['vorp_ppr'] > 0].sort_values('adp_ppr')
+
+    iso = IsotonicRegression(increasing=False, out_of_bounds='clip')
+    iso.fit(fit_group['adp_ppr'], fit_group['vorp_ppr'])
+
+    group['expected_vorp_iso'] = iso.predict(group['adp_ppr'])
+    group['residual_iso'] = group['vorp_ppr'] - group['expected_vorp_iso']
+    return group
+
+df = df.groupby('position', group_keys=False).apply(calc_residuals_isotonic)
+```
+
+Two design decisions worth explaining:
+
+**Fitting only on positive-VORP players:** Late-round players with negative VORP represent below-replacement-level projections. Including them in the fit would pull the curve downward at the high-ADP end, distorting expectations for mid-round players. By restricting the fit to positive-VORP players, the curve represents the expected value dropoff among actually draftable players.
+
+**`out_of_bounds='clip'`:** For players whose ADP falls outside the fitted range, this clips their expected VORP to the nearest boundary value rather than extrapolating.
+
+**The one remaining limitation:** The very best players — Bijan Robinson, Jahmyr Gibbs, Christian McCaffrey — sit at the top of the curve and become its anchor points. The model has nothing above them to compare against, so they show zero residual by definition. Evaluating true first-round value would require an external benchmark like historical finish distributions.
+
+---
+
+## The Findings
+
+### Undervalued Players
+
+Players with the highest positive isotonic residuals — delivering more VORP than expected for their ADP, evaluated within their position group.
+
+<FantasyUndervaluedBar />
+
+**Derrick Henry (+24.1)** is the most striking finding. At ADP 34.5, he's being treated as a late third-round pick, yet he projects for 191 VORP — placing him third among all RBs in the isotonic rankings. Age concerns are real, but the model doesn't account for injury risk: it's purely saying the market is discounting his projected output more than the numbers justify.
+
+**Zay Flowers (+19.0) and Garrett Wilson (+14.9)** are the clearest wide receiver values. Both have ADPs in the 40-50 range but project significantly above other WRs being drafted at similar prices. Flowers ranks #1 among all WRs in the isotonic model.
+
+**Ashton Jeanty (+9.2) and De'Von Achane (+12.7)** are notable because they appear undervalued even in the first two rounds — being drafted at ADP 15-16 while projecting for 207-210 VORP, numbers that rival players drafted a round earlier.
+
+---
+
+### Overvalued Players
+
+Players with the largest negative isotonic residuals — being drafted earlier than their projected VORP justifies relative to positional peers.
+
+<FantasyOvervaluedBar />
+
+**Kenneth Walker (-21.8) and Bucky Irving (-22.3)** show the largest overvaluation signals among RBs. Both are being drafted as though they'll produce at the level of their ADP peers, but their VORP projections don't support that price. Walker in particular at ADP 14.6 is surrounded by players like Ashton Jeanty and De'Von Achane who project for 30+ more VORP.
+
+**A.J. Brown (-10.7) and Tee Higgins (-11.1)** tell a similar WR story. Both are established names being drafted in rounds 2-3, but project at levels closer to replacement value at their position. This could reflect injury history pricing — the market may be buying their upside more than the projections capture.
+
+---
+
+### The ADP vs VORP Full Picture
+
+<FantasyPositionScatter />
+
+A few things jump out from this view. The RB cluster at the top-left shows several high-VORP backs (Derrick Henry, Chase Brown, Josh Jacobs) scattered across a wide ADP range despite similar VORP projections — this is exactly the kind of spread the residual model is designed to exploit. The TE position (yellow) shows a steep cliff after Trey McBride and Brock Bowers, which justifies early TE investment if you miss on those two.
+
+---
+
+## Honest Limitations
+
+No model is complete, and I want to be upfront about what this analysis misses:
+
+**Injury risk is not modeled.** The projections treat all players as equally likely to stay healthy. A 30-year-old RB with 8 years of wear carries meaningfully more injury risk than a rookie, even at the same projected VORP. Future iterations could incorporate age, years of experience, and historical injury rates.
+
+**Rookie variance is not penalized.** Ashton Jeanty and Omarion Hampton show up as high-value picks, but rookie projections have far higher variance than veteran projections. The model treats a rookie's 200 VORP the same as a proven veteran's 200 VORP.
+
+**The top picks are ungraded.** Because the isotonic curve anchors to the highest-VORP players at the lowest ADP, first-round studs like Bijan Robinson and Jahmyr Gibbs show zero residual — not because they have no value, but because the model can't evaluate them against a higher baseline. External benchmarks like historical percentile finishes would fix this.
+
+**ADP reflects crowd psychology, not truth.** The market has biases — recency bias, name recognition, positional hype cycles. By using ADP as the baseline, the residual is measuring deviation from market consensus, not deviation from true value. If the market is systematically wrong about a position (which it often is), the residuals absorb that bias.
+
+**Schedule and matchup difficulty are ignored.** Projected points are season-long averages. A player with a favorable schedule of weak defenses is more likely to hit his projection than one facing tough matchups.
+
+---
+
+## What I'd Build Next
+
+If I were to extend this project, the highest-value additions would be:
+
+1. **Opportunity share metrics** — target share and snap percentage tell you how much of a team's offense flows through a player, which predicts projection reliability better than raw projected points
+2. **Historical variance by position** — using prior seasons to estimate the typical error range around projections at each position, then discounting VORP for high-variance positions
+3. **Strength of schedule adjustment** — weighting projections by the difficulty of opponents across the season
+4. **Survival analysis for injury risk** — using age, position, and years of experience to assign a durability discount to each player's projected VORP
+
+---
+
+## Takeaways for Other Data Science Students
+
+A few things I'd tell myself at the start of this project:
+
+**Debugging a broken model teaches more than a working one.** The polynomial overfitting failure was the most educational moment of this project. Understanding *why* a cubic fit chases outliers at the tails — and how to recognize that symptom in the output — is a skill that transfers to any regression problem.
+
+**Domain knowledge shapes model selection.** I only arrived at isotonic regression because I stopped and asked what I *know* to be true about this domain. The monotone constraint isn't a statistical trick; it's a logical truth about how draft markets work. Good modeling starts with understanding the problem, not the algorithm.
+
+**Relational databases beat flat files for multi-dimensional data.** Managing player, projection, and ADP data as three normalized tables with foreign key constraints made every JOIN reliable and every aggregation clean. CSV files would have introduced silent merge errors all over the place.
+
+**Per-group modeling matters.** Running the regression within each position group rather than across all players was a deliberate design choice. It's the difference between "how does this WR compare to all players at his ADP?" and "how does this WR compare to WRs at his ADP?" — the second question is what you actually care about in a draft.
+
+---
+
+*The full code for this project is available on GitHub at [your-github-link]. Data sourced from the Sleeper API. All projections are 2026 season estimates and subject to change as rosters develop through training camp.*
+
+*#DataScience #Python #MachineLearning #SQL #FantasyFootball #Analytics #StudentProject*

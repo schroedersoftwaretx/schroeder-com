@@ -5,6 +5,12 @@
     <link>https://schrodersoftware.com</link>
     <description>Software engineer and data scientist — portfolio, blog, and resume.</description>
     <item>
+      <title>Finding Value in the Draft: A Data Science Approach to Fantasy Football</title>
+      <link>https://schrodersoftware.com/blog/fantasy-football-analysis</link>
+      <description>How I built a SQL database, wrote Python regression models, and used machine learning to find undervalued NFL players for the 2026 season — and what I learned when my models kept breaking.</description>
+      <pubDate>Mon, 13 Apr 2026 00:00:00 GMT</pubDate>
+    </item>
+    <item>
       <title>Building a Portfolio Website</title>
       <link>https://schrodersoftware.com/blog/portfolio-website-creation</link>
       <description>How I made and deployed a website to host my resume and computer science blogs.</description>

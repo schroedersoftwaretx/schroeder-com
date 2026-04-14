@@ -3,6 +3,13 @@ import Image from 'next/image'
 import { MDXRemote } from 'next-mdx-remote/rsc'
 import { highlight } from 'sugar-high'
 import React from 'react'
+import remarkGfm from 'remark-gfm'
+import {
+  FantasyOvervaluedBar,
+  FantasyPositionScatter,
+  FantasyTop50TierScatter,
+  FantasyUndervaluedBar,
+} from 'app/components/blog/fantasy-football-charts'
 
 function Table({ data }) {
   let headers = data.headers.map((header, index) => (
@@ -137,13 +144,29 @@ let components = {
   Lead,
   Callout,
   Signature,
+  FantasyTop50TierScatter,
+  FantasyUndervaluedBar,
+  FantasyOvervaluedBar,
+  FantasyPositionScatter,
 }
 
 export function CustomMDX(props) {
+  const { options: userOptions, components: userComponents, ...rest } = props
+  const userMdx = userOptions?.mdxOptions ?? {}
+  const userRemark = Array.isArray(userMdx.remarkPlugins)
+    ? userMdx.remarkPlugins
+    : []
   return (
     <MDXRemote
-      {...props}
-      components={{ ...components, ...(props.components || {}) }}
+      {...rest}
+      options={{
+        ...userOptions,
+        mdxOptions: {
+          ...userMdx,
+          remarkPlugins: [remarkGfm, ...userRemark],
+        },
+      }}
+      components={{ ...components, ...(userComponents || {}) }}
     />
   )
 }
