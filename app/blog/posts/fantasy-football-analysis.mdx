@@ -46,10 +46,26 @@ The standard league format for fantasy football has 12 teams starting 1 quarterb
 
 The data for this project was a little hard to come by. I explored a couple of different options for data sources but there isn’t much information to work off of this early in the pre-season. Fortunately, **Sleeper** is a fantasy football platform that runs a lot of drafts early in the season. I was able to collect information such as:
 
-- **Average Draft Position (ADP)** — where managers in real leagues are actually drafting each player
-- **Projected fantasy points** — Sleeper's early-season estimates for 2026
+**ADP (Average Draft Position)** — the market price. Where managers in real Sleeper leagues are actually drafting a player. Lower is better.
+
+**Projected fantasy points** — Sleeper's early-season estimates for 2026, which I used to calculate our next stat.
+
+**VORP (Value Over Replacement Player)** — Due to the difference in positions, VORP is a better indication of player value. VORP allows us to see how many more points wil this player score compared to a player we could pick up for free.
 
 Projecting fantasy points scored this far in the future is not very accurate, but it should give us something to work off of, especially since the ADP is being worked off of this information. Sleeper should also be a fairly accurate source compared to other platforms because they are also a sports betting platform, and put a lot of resources into setting targets for each player. Whatever information is available to the public, Vegas and betting companies will know it and more!
+
+A look at the Value Of a Replacement Player:
+
+| Position |  'Replacement Player'  |  Rank |  Projected Points  |
+|---|---|---|---|
+| Quarterback |  Bryce Young  | QB25 |  225.26  |
+| Running Back |  Kaleb Johnson  | RB61 |  44.20  |
+| Wide Receiver |  Chimere Dike  | WR61 |  119.50  |
+| Tight End |  Chig Okonkwo  | TE25 |  108.70  |
+
+Notice how the quality of a replacement running back is *much* lower than that of a replacement wide reciever or tight end.
+
+The core question going into the modeling: *given a player's ADP, how much VORP should we expect and who is beating that expectation?*
 
 ---
 
@@ -107,19 +123,6 @@ CREATE TABLE adp (
 );
 ```
 
-
-## The Two Key Metrics
-
-Everything in this analysis comes back to two numbers:
-
-**ADP (Average Draft Position)** — the market price. Where managers in real Sleeper leagues are actually drafting a player. Lower is better.
-
-**VORP (Value Over Replacement Player)** — Due to the difference in positions, VORP is a better indication of player value. VORP allows us to see how many more points wil this player score compared to a player we could pick up for free.
-
-The core question driving all the modeling: *given a player's ADP, how much VORP should we expect and who is beating that expectation?*
-
----
-
 ## Step 1: Building Tiers with K-Means Clustering
 
 Before looking at the value of individual players, I wanted to get a grasp for what the distribution of values were. Your first thought might be to make tiers of 12. Each round in the draft consists of 12 picks, but the issue is that player values don’t fall evenly every 12 picks. It wouldn’t make sense to make tiers based off of ADP alone. Thus, I needed a solution that found value cliffs independent of round size.
@@ -152,23 +155,13 @@ df['Tier'] = df['Tier'].map(tier_map)
 
 Looking at the graph, we can see some interesting trends already.
 
-We can see that running backs have a fairly high VORP when compared to other players. NFL teams vary greatly in the quality and volume of their run game. Some teams run the ball enough to produce one or two usable running backs, but most teams only have one (if any). This leaves us with a baseline value of 44.20 points for a replacement player.
+Like from the table above, you can see that running backs have a fairly high VORP when compared to other players. NFL teams vary greatly in the quality and volume of their run game. Some teams run the ball enough to produce one or two usable running backs, but most teams only have one (if any). This leaves us with that baseline value of 44.20 points for a replacement player.
 
 Wide receiver opportunities tend to vary game by game, but you’ll find two or three players producing on any given team compared to the one or two you’d expect with running backs. This increased number of usable assets leaves us with a baseline of 119.5 points, which is almost three times as many points as a free running back!
 
 Meanwhile, the quarterbacks that made up a majority of the top 25 scorers are nowhere to be found! The highest scoring quarterback, Josh Allen, isn’t seen until ADP 28, and he is only joined by Lamar Jackson (ADP 38) and Drake Maye (ADP 46) inside the top 50. Tight ends are similarly sparse, with two elite tight ends sticking out: Trey McBride (ADP 19) and Brock Bowers (ADP 26), with Colston Loveland (ADP 47) near the end of the top 50.
 
 This representation of the top players was definitely better than looking at projected points scored or ADP alone, but I felt I could do better in finding outliers and differentiating between positions.
-
-
-| Position |  'Replacement Player'  |  Rank |  Projected Points  |
-|---|---|---|---|
-| Quarterback |  Bryce Young  | QB25 |  225.26  |
-| Running Back |  Kaleb Johnson  | RB61 |  44.20  |
-| Wide Receiver |  Chimere Dike  | WR61 |  119.50  |
-| Tight End |  Chig Okonkwo  | TE25 |  108.70  |
-
-Notice the big difference between the quality of player left at running back compared to wide receiver!
 
 <FantasyFullRosterScatter />
 
@@ -204,7 +197,7 @@ df = df.groupby('position', group_keys=False).apply(calc_residuals_linear)
 
 **Why it broke:** Draft value doesn't fall off in a straight line. The drop from pick 1 to pick 10 is enormous. The drop from pick 80 to pick 90 is minimal. A straight line assumes a constant rate of decline across the entire draft, which means it systematically over-expects from early picks and under-expects from late picks.
 
-The result: the linear model was still heavily biased toward early round players, especially when it came to running backs. Early round players are significantly more valuable and scew the expected slope of value decline throughout the draft. When aggregating the lines, we see once again that running backs within the top 50 are still considered to be much more valuable.
+The result: despite attempts at normalization, the linear model was heavily biased toward early round players, especially when it came to running backs. Early round running backs are significantly more valuable and scew the expected slope of value decline throughout the draft.
 
 <FantasyLinearRegressionChart />
 
@@ -232,7 +225,7 @@ This looked promising at first — the curve tracked the data reasonably well in
 
 *Orange = cubic fit. To reach the extreme negatives at ADP 220–250, the curve overshoots by predicting VORP even more negative than the actual data. That makes Williams (gold, right) appear **above** the curve (positive residual = "undervalued"), while JSN (gold, left) gets pulled **below** it.*
 
-When I checked the specific rankings this produced, the problem was undeniable:
+When I checked the rankings this produced, problems stood out immediately:
 
 | Player | ADP | VORP | Poly Rank |
 |---|---|---|---|
@@ -245,15 +238,15 @@ Keon Coleman and Kyle Williams, two notable underperformers last season, were ra
 
 **What went wrong:** This is a textbook example of *overfitting at the tails*. Sleeper has ADP data for the first 20 rounds of a draft, well beyond what is typically used for fantasy formats. Because these two players happened to be at the very bottom of the ADP range, and players like Puka Nacua and Ja’Marr Chase at the top of the position have VORP scores close to 200, having a VORP of even -80 seemed like an incredible steal to the model.
 
-The key insight here: **a model that fits the data too closely in one region breaks everywhere else.** Polynomial fitting is powerful but I applied it incorrectly here. This data isn't a fit for cubic recession, especially with the meaningful outliers at the extreme ends.
+The key insight here: **a model that fits the data too closely in one region breaks everywhere else.** Polynomial fitting is powerful but I applied it incorrectly here. This data isn't a fit for cubic regression, especially with the meaningful outliers at the extreme ends.
 
 ---
 
-### Attempt 3: Isotonic Regression (The Right Tool)
+### Attempt 3: Isotonic Regression
 
 After diagnosing two broken models, I stepped back and asked: what do I actually *know* to be true about this problem?
 
-One thing should be true in a fantasy draft: **a player drafted later should not be expected to outscore a player drafted earlier**. For the most part, you would expect that a running back drafted ahead of another running back would have a higher projected point total Isotonic regression enforces exactly this constraint. It fits a **monotonically decreasing staircase** to the data. In English: It means that it should never go back up. No specific curve shape is assumed. It finds the best-fitting line such that every step to the right is flat or lower.
+One thing should be true in a fantasy draft: **a player drafted later should not be expected to outscore a player drafted earlier**. For the most part, you would expect that a running back drafted ahead of another running back would have a higher projected point total. Isotonic regression enforces exactly this constraint. It fits a **monotonically decreasing staircase** to the data. In English: It means that it should never go back up. No specific curve shape is assumed. It finds the best-fitting line such that every step to the right is flat or lower.
 
 ```python
 from sklearn.isotonic import IsotonicRegression
@@ -318,11 +311,11 @@ Bucky Irving is in an awkward position as one of only three running backs in the
 
 There are a few wide receivers labeled as overvalued relative to their position. **Jaylen Waddle (-14.9)** was spoken about in detail earlier, but his ADP leaves him in the late fourth round when his VORP is better matched with those nearly two and a half rounds later in the early sixth.
 
-**A.J. Brown (-10.7) and Tee Higgins (-11.1)** tell a similar WR story. These two are WR12 and WR14 respectively, making them on the lower end of first option wide receivers or the higher end of secondary receivers.
+**AJ Brown (-10.7) and Tee Higgins (-11.1)** tell a similar WR story. These two are WR12 and WR14 respectively, making them on the lower end of first option wide receivers or the higher end of secondary receivers.
 
-In the case of A.J. Brown, he is at the start of a value cliff for wide receivers. He has a VORP of 106 and comes right after a line of second round receivers projected for about 10 more points. A.J. Brown also comes right before Rashee Rice, who has the projected VORP of a first round player but finds himself further down the ADP due to some uncertainty surrounding issues off the field. I think A.J. Brown is a good player, but he finds himself on the edge of a value cliff. Good strategy would be to grab a wide receiver right before him, or to wait a round or two for another option.
+In the case of AJ Brown, he is at the start of a value cliff for wide receivers. He has a VORP of 106 and comes right after a line of second round receivers projected for about 10 more points. AJ Brown also comes right before Rashee Rice, who has the projected VORP of a first round player but finds himself further down the ADP due to some uncertainty surrounding issues off the field. I think AJ Brown is a good player, but he finds himself on the edge of a value cliff. Good strategy would be to grab a wide receiver right before him, or to wait a round or two for another option.
 
-Tee Higgins is a similar case as he comes right after Rashee Rice and the value dropoff that A.J. Brown finds himself under. However, I think there is a much stronger case for him being genuinely overvalued in comparison to A.J. Brown. Higgins at WR14 has a VORP below 90, and skipping past the already mentioned A.J. Brown and Rashee Rice, the next WR is Chris Olave with almost 30 more projected points. A very comparable player is DeVonta Smith, who is in a similar situation as the secondary receiver on his team. Smith has nearly identical VORP, and is available two rounds later at pick 56.
+Tee Higgins is a similar case as he comes right after Rashee Rice and the value dropoff that AJ Brown finds himself under. However, I think there is a much stronger case for him being genuinely overvalued in comparison to AJ Brown. Higgins at WR14 has a VORP below 90, and skipping past the already mentioned AJ Brown and Rashee Rice, the next WR is Chris Olave with almost 30 more projected points. A very comparable player is DeVonta Smith, who is in a similar situation as the secondary receiver on his team. Smith has nearly identical VORP, and is available two rounds later at pick 56.
 
 ---
 
@@ -335,9 +328,9 @@ As a stat head, I could have talked on and on about more interesting statistics 
 As mentioned before, isotonic regression also did little to help us at the very top of the draft. The curve was anchored by these elite players at the very top and so we didn’t have much insight in the very first round when it came to residuals. There is a clear difference between Bijan Robinson and Gibbs. As spoken about before, there is as much of a difference between the number one player and the seventh player as there is between the seventh player and the 45th. Isotonic regression just isn’t the right approach for finding value differences between the most elite players.
 
 
-**Naive Approach** Beyond the limitations of isotonic regression, it was undeniably a naive approach to work with only two data points. There are an infinite number of factors that go into fantasy performance and there are so many things that you simply can’t model for a player. However, there are definitely some more reliable data points that I could have implemented that would have added more depth to my insights.
+**Naive Approach** Beyond the limitations of isotonic regression, it was a naive approach to work with only two data points. There are an infinite number of factors that go into fantasy performance and there are so many things that you simply can’t model for a player. Obviously I can't go about modeling the individual diets and sleep routines of NFL players to track performance. However, there are definitely some more reliable data points that I could have implemented that would have added more depth to my insights.
 
-**Risk and Variance** Injury risk is a very real threat to a player’s production, and being injury prone can hurt your ADP even if your projected points are high. This is especially important for running backs, who are more likely to be injured, and it also contributes to the value of a backup running back. That ties into variance for point projections. A backup running back might have -20 VORP for the season, but a single injury to the starter could easily skyrocket that player by multiple rounds of value. Younger players will tend to have more variance in their performance compared to older players, but that comes back to older players also having more injury risk and physical decline. Rookie picks are especially variable, and it’s hard to imagine where Sleeper got their projections for players like Jeremiyah Love when the draft has yet to happen.
+**Risk and Variance** Injury risk is a  real threat to a player’s production, and being injury prone can hurt your ADP even if your projected points are high. This is especially important for running backs, who are more likely to be injured, and it also contributes to the value of a backup running back. That ties into variance for point projections. A backup running back might have -20 VORP for the season, but a single injury to the starter could easily skyrocket that player by multiple rounds of value. Younger players will tend to have more variance in their performance compared to older players, but that comes back to older players also having more injury risk and physical decline. Rookie picks are especially variable, and it’s hard to imagine where Sleeper got their projections for players like Jeremiyah Love when the draft has yet to happen.
 
 ---
 
