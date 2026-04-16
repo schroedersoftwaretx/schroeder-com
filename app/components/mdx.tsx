@@ -5,10 +5,14 @@ import { highlight } from 'sugar-high'
 import React from 'react'
 import remarkGfm from 'remark-gfm'
 import {
+  FantasyIsotonicRegressionChart,
+  FantasyLinearRegressionChart,
   FantasyOvervaluedBar,
+  FantasyPolynomialRegressionChart,
   FantasyPositionScatter,
   FantasyTop50TierScatter,
   FantasyUndervaluedBar,
+  FantasyFullRosterScatter,
 } from 'app/components/blog/fantasy-football-charts'
 
 function Table({ data }) {
@@ -148,6 +152,10 @@ let components = {
   FantasyUndervaluedBar,
   FantasyOvervaluedBar,
   FantasyPositionScatter,
+  FantasyLinearRegressionChart,
+  FantasyPolynomialRegressionChart,
+  FantasyIsotonicRegressionChart,
+  FantasyFullRosterScatter,
 }
 
 export function CustomMDX(props) {

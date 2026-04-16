@@ -15,6 +15,7 @@
   --sh-jsxliterals: #6266d1;
   --sh-property: #e25a1c;
   --sh-entity: #e25a1c;
+  --chart-regression-line: #000000;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,6 +24,7 @@
     --sh-identifier: white;
     --sh-keyword: #f47067;
     --sh-string: #0fa295;
+    --chart-regression-line: #f1f5f9;
   }
   html {
     color-scheme: dark;
