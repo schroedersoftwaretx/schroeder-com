@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { CustomMDX } from 'app/components/mdx'
 import { formatDate, getBlogPosts } from 'app/blog/utils'
-import { baseUrl, siteName } from 'app/site'
+import { baseUrl, defaultOgImage, siteName } from 'app/site'
 
 type PageProps = {
   params: Promise<{ slug: string }>
@@ -28,32 +28,32 @@ export async function generateMetadata({ params }: PageProps) {
     summary: description,
     image,
   } = post.metadata
-  const absoluteImage = image
-    ? image.startsWith('http')
-      ? image
-      : `${baseUrl}${image}`
-    : undefined
+  // Fall back to the site-wide card so posts without their own `image` still
+  // render a proper preview instead of a bare text link.
+  const rawImage = image || defaultOgImage
+  const absoluteImage = rawImage.startsWith('http')
+    ? rawImage
+    : `${baseUrl}${rawImage}`
 
   return {
     title,
     description,
+    alternates: {
+      canonical: `/blog/${post.slug}`,
+    },
     openGraph: {
       title,
       description,
       type: 'article',
       publishedTime,
       url: `${baseUrl}/blog/${post.slug}`,
-      ...(absoluteImage
-        ? {
-            images: [{ url: absoluteImage }],
-          }
-        : {}),
+      images: [{ url: absoluteImage }],
     },
     twitter: {
-      card: absoluteImage ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
-      ...(absoluteImage ? { images: [absoluteImage] } : {}),
+      images: [absoluteImage],
     },
   }
 }
@@ -79,13 +79,9 @@ export default async function Blog({ params }: PageProps) {
             datePublished: post.metadata.publishedAt,
             dateModified: post.metadata.publishedAt,
             description: post.metadata.summary,
-            ...(post.metadata.image
-              ? {
-                  image: post.metadata.image.startsWith('http')
-                    ? post.metadata.image
-                    : `${baseUrl}${post.metadata.image}`,
-                }
-              : {}),
+            image: (post.metadata.image || defaultOgImage).startsWith('http')
+              ? post.metadata.image
+              : `${baseUrl}${post.metadata.image || defaultOgImage}`,
             url: `${baseUrl}/blog/${post.slug}`,
             author: {
               '@type': 'Person',

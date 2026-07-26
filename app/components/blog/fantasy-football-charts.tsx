@@ -223,7 +223,7 @@ export function FantasyUndervaluedBar() {
             dataKey="name"
             stroke="#94a3b8"
             tick={{ fill: 'var(--chart-regression-line)', fontSize: 12 }}
-            width={125}
+            width={90}
           />
           <Tooltip content={<ResidualTooltip />} />
           <ReferenceLine x={0} stroke="#64748b" />
@@ -269,7 +269,7 @@ export function FantasyOvervaluedBar() {
             dataKey="name"
             stroke="#94a3b8"
             tick={{ fill: 'var(--chart-regression-line)', fontSize: 12 }}
-            width={125}
+            width={90}
           />
           <Tooltip content={<ResidualTooltip />} />
           <ReferenceLine x={0} stroke="#64748b" />

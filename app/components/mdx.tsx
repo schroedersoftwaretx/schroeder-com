@@ -14,6 +14,9 @@ import {
   FantasyUndervaluedBar,
   FantasyFullRosterScatter,
 } from 'app/components/blog/fantasy-football-charts'
+import UtsaGptPipelineDiagram from 'app/components/blog/UtsaGptPipelineDiagram'
+import Bm25ScoreExplorer from 'app/components/blog/Bm25ScoreExplorer'
+import RerankFunnelDiagram from 'app/components/blog/RerankFunnelDiagram'
 
 function Table({ data }) {
   let headers = data.headers.map((header, index) => (
@@ -40,6 +43,13 @@ function Table({ data }) {
 function CustomLink(props) {
   let href = props.href
 
+  // An <a> written as raw JSX in MDX arrives here with no href at all, which
+  // used to throw on href.startsWith and take down the whole page render.
+  // Degrade to a plain anchor instead.
+  if (typeof href !== 'string') {
+    return <a {...props} />
+  }
+
   if (href.startsWith('/')) {
     return (
       <Link href={href} {...props}>
@@ -62,6 +72,22 @@ function RoundedImage(props) {
 function Code({ children, ...props }) {
   let codeHTML = highlight(children)
   return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />
+}
+
+/**
+ * Flattens React children to plain text. Headings that mix text with inline
+ * markup (e.g. `## Step 1: Ingestion (\`main.py\`)`) arrive as an array, and
+ * calling .toString() on that yields "...,[object Object],..." — which used to
+ * leak into the anchor id. Recurse into elements and keep only the text.
+ */
+function childrenToText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(childrenToText).join('')
+  if (React.isValidElement(node)) {
+    return childrenToText((node.props as { children?: React.ReactNode })?.children)
+  }
+  return ''
 }
 
 function slugify(str) {
@@ -114,7 +140,7 @@ function Signature({ children }: { children: React.ReactNode }) {
 
 function createHeading(level) {
   const Heading = ({ children }) => {
-    let slug = slugify(children)
+    let slug = slugify(childrenToText(children))
     return React.createElement(
       `h${level}`,
       { id: slug },
@@ -156,6 +182,9 @@ let components = {
   FantasyPolynomialRegressionChart,
   FantasyIsotonicRegressionChart,
   FantasyFullRosterScatter,
+  UtsaGptPipelineDiagram,
+  Bm25ScoreExplorer,
+  RerankFunnelDiagram,
 }
 
 export function CustomMDX(props) {

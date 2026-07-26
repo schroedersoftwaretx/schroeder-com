@@ -3,10 +3,8 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Navbar } from './components/nav'
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/next'
 import Footer from './components/footer'
-import { baseUrl, siteDescription, siteName } from './site'
+import { baseUrl, defaultOgImage, siteDescription, siteName } from './site'
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -15,6 +13,9 @@ export const metadata: Metadata = {
     template: `%s | ${siteName}`,
   },
   description: siteDescription,
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: siteName,
     description: siteDescription,
@@ -22,6 +23,20 @@ export const metadata: Metadata = {
     siteName,
     locale: 'en_US',
     type: 'website',
+    images: [
+      {
+        url: defaultOgImage,
+        width: 1200,
+        height: 630,
+        alt: siteName,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteName,
+    description: siteDescription,
+    images: [defaultOgImage],
   },
   robots: {
     index: true,
@@ -57,8 +72,6 @@ export default function RootLayout({
           <Navbar />
           {children}
           <Footer />
-          <Analytics />
-          <SpeedInsights />
         </main>
       </body>
     </html>

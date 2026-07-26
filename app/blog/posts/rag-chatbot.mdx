@@ -1,0 +1,441 @@
+---
+title: "Building UTSA GPT: Teaching Gemini to Answer From My Data, Not Its Own"
+publishedAt: "2026-05-20"
+summary: "How I built the backend for a RAG chatbot in my senior design class: a Selenium scraper, a Firestore ingest layer, hybrid retrieval with a cross-encoder reranker, and an async FastAPI service. Then everything that broke quietly instead of loudly, including a bug I only found while writing this post."
+---
+
+# Building UTSA GPT: Teaching Gemini to Answer From My Data, Not Its Own
+
+<Lead>
+  This blog goes over the creation of UTSA GPT, my senior design project. My team built a chatbot that accurately answers questions about large datasets by grounding Google's Gemini on private databases. I owned the Python backend and RAG implementation. My partners built ingestion pipelines and the React frontend. This post is a deep dive into the backend, including the architecture, the code, and plenty of issues that occurred along the way.
+</Lead>
+
+---
+
+## Why This Project Exists
+
+Large language models are very good at sounding confident and very bad at admitting they don't know something. If you ask Gemini what time your favorite sports team plays this weekend, it struggles to answer honestly. That information isn't in its training data, and it can't always go look it up. Thus, it produces a sentence with the correct *shape* of an answer and hopes for the best.
+
+The standard fix for this is known as **Retrieval-Augmented Generation**, or RAG. The idea is that instead of asking the model to know things, you hand it the relevant documents at the moment you ask the question, then tell it to answer using only what's in front of it. The model is no longer in charge of providing information and instead acts as a reasoning engine for your data.
+
+My team wanted hands-on experience with the whole thing. We didn't want to build a glorified API wrapper. We wanted to build the scraper, the ingestion, the embedding cache, the retriever, the reranker, and the service layer. Our mentor for the project taught us how to go about planning our project, and splitting responsibilities. One of my partners was much more interested in the React side, another interested in databases and storage, and another interested in cyber security and cloud. Our split was very clean and organized: I owned everything behind a single `POST /chat` endpoint, and our frontend partner owned everything in front of it. I was able to work on the backend without worrying about the frontend, only worrying about the request and response shape for that endpoint. My other two partners worked on ingestion and security, allowing me to focus on building the service layer upon their data.
+
+We used an NFL schedule as our first test dataset. It was easy to reason about, easy to verify answers against, and small enough that we could eyeball whether retrieval was working. But the backend was designed from the beginning to be collection-agnostic. Point it at a different Firestore collection and you have a chatbot for a different dataset, without touching the retrieval code. I'll touch more on this later.
+
+---
+
+## What RAG Actually Is
+
+When a user asks a question, you don't send that question straight to the LLM. First you search your own data for a handful of 'documents' that look relevant. Then you paste those documents into the prompt alongside the question and instruct the model to answer using only that context.
+
+The strength *and* weakness of RAG is that **the quality of your chatbot is almost entirely determined by the quality of your search.** If you hand the model the wrong five documents, it will either hallucinate or tell you it doesn't know. However, if you hand it the right five, even a simple, inexpensive model gives you a precise answer.
+
+I did not fully appreciate this at the start. I spent my first week tuning the prompt. I should have spent it on the retriever.
+
+The pipeline I ended up with has six stages:
+
+| Stage | What happens |
+|---|---|
+| Scrape | Selenium pulls the source data into a CSV or other format |
+| Ingest | Data rows go into Firestore, then come back out as `Document` objects |
+| Embed | Each document becomes a 384-dimension vector, cached by content hash |
+| Retrieve | Score every document against the query using keyword density *and* the meaning behind the document |
+| Rerank | A cross-encoder re-scores the top 10 relevant documents and passes off the best 5 |
+| Generate | Send the question plus those 5 documents to Gemini |
+
+<UtsaGptPipelineDiagram />
+
+*Data flows one direction: Data Source (ESPN) → CSV → Firestore → LlamaIndex Documents → embeddings + BM25 index → hybrid retrieval → cross-encoder rerank → Gemini → response.*
+
+---
+
+## The Tech Stack
+
+| Layer | Tool |
+|---|---|
+| Scraper | Selenium + chromedriver |
+| Data store | Google Firestore, via `firebase-admin` |
+| Document abstraction | LlamaIndex `Document` |
+| Embedding model | SentenceTransformers `all-MiniLM-L6-v2` (local, 384-dim) |
+| Sparse retrieval | `rank_bm25` (BM25Okapi) |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| LLM | Gemini 2.5 Flash, public API |
+| Service | FastAPI + uvicorn, fully async |
+| Vector cache | A JSON file keyed by SHA-256 of the document contents |
+
+A few of these choices shaped everything downstream, so they're worth explaining before I walk through the code.
+
+**Embeddings run locally.** I could have called an embedding API for every document and every query. Instead `all-MiniLM-L6-v2` runs on CPU, in milliseconds, for free, and never sends our data to a third party. For short factual documents like schedule rows, the quality difference against a paid embedding API is not something I could measure.
+
+**Firestore** was a team decision. We were already working within the google ecosystem, and the document model worked if we assumed "one row equals one chunk of context."
+
+---
+
+## Step 1: Getting the Data
+
+Before there was anything to retrieve, there had to be data. ESPN publishes the NFL schedule as weeks, so my partner wrote a Selenium scraper that walks through the weeks and pulls each table.
+
+```python
+def scrape_current_page(driver, all_games, clean_games):
+    days = driver.find_elements(By.CLASS_NAME, "Table__Title")
+    tables = driver.find_elements(By.CLASS_NAME, "Table__TBODY")
+
+    for i in range(len(days)):
+        date = days[i].text
+        rows = tables[i].find_elements(By.TAG_NAME, "tr")
+
+        for row in rows:
+            cols = row.find_elements(By.TAG_NAME, "td")
+            if len(cols) >= 2:
+                all_games.append({
+                    "Date": date,
+                    "Away": cols[0].text,
+                    "Home": cols[1].text,
+                })
+    clean_data(all_games, clean_games)
+```
+
+ESPN gives you `"Sunday, September 7, 2025"` in one cell and `"@ Philadelphia"` in another, so there's a pass that splits the day off the date, strips the year, and removes the `@` from the home team. The result was a CSV of 47 games, which then got pushed into Firestore.
+
+---
+
+## Step 2: Ingestion
+
+The job here is to take a Firestore collection and turn it into a list of `Document` objects the rest of the pipeline understands.
+
+```python
+def load_documents(collection: str) -> list[Document]:
+    db = _get_db()
+    documents = []
+    for doc in db.collection(collection).stream():
+        text = ", ".join(f"{k}: {v}" for k, v in doc.to_dict().items())
+        documents.append(Document(text=text, metadata={"doc_id": doc.id}))
+    return documents
+```
+
+A schedule row comes out the other side as a single document: `"day: Thursday, date: September 4, away: Dallas, home: Philadelphia"`.
+
+**Why serialize generically like that?** Because I initially wrote NFL field names into this function, the backend was specific to NFL data. The generic `key: value` format extracts the data into a format the embedding model can understand, meaning this ingestion never has to change when we point the chatbot at a new collection. It would be easy to customize this step for individual datasets, but this approach ensured we could reuse the retrieval and generation layers without worrying about what data we were receiving.
+
+The `_get_db()` helper initializes Firebase Admin exactly once, working as a lazy singleton initializer, and checks `firebase_admin._apps` before doing it.
+
+---
+
+## Step 3: Embedding, and a Cache That Doesn't Lie
+
+Every document has to become a vector before you can do similarity search. Embedding 48 documents on CPU doesn't take long. However, this quickly builds as you introduce more documents, and the embedding model is the slowest part of the pipeline. I didn't want to re-embed everything every time I restarted the server, so I built a cache. The first version keyed on file modification time, which seemed like the obvious thing to do, but it was very wrong.
+
+Modification times lie. A git checkout touches files without changing them. Some editors rewrite a file on save even when nothing changed. I switched my editor partway through the semester and suddenly every restart was re-embedding everything, and it took me an embarrassingly long time to connect those two facts.
+
+The fix was to stop asking *when* the documents changed and start asking *whether* they changed:
+
+```python
+def _hash_contents(contents: list[str]) -> str:
+    combined = "\n".join(contents).encode("utf-8")
+    return hashlib.sha256(combined).hexdigest()
+
+
+def load_or_embed(agent, contents):
+    current_hash = _hash_contents(contents)
+
+    if CACHE_FILE.exists():
+        cached = json.loads(CACHE_FILE.read_text())
+        if cached.get("hash") == current_hash:
+            agent._build_bm25(contents)
+            return np.array(cached["vectors"])
+        print("Documents changed — re-embedding...")
+
+    vectors = agent.embed(contents)
+    CACHE_FILE.write_text(json.dumps({"hash": current_hash, "vectors": vectors}))
+    return np.array(vectors)
+```
+
+The content hash saved a lot of time. Change one character in one document and the hash changes and we re-embed. Change nothing and we read 48 vectors off disk instantly.
+
+<Callout title="On caching the right thing">
+  Notice the `_build_bm25(contents)` call on the cache-hit path. The dense vectors get cached because they're expensive. The BM25 index doesn't, because rebuilding it from raw text is nearly free, but it still has to be rebuilt or you silently fall back to vector-only search. Caching is easy, remembering everything that has to be reconstructed alongside the cache is the punishing part.
+</Callout>
+
+---
+
+## Step 4: Hybrid Retrieval
+
+The default approach is to embed the query, run cosine similarity against every document vector, and take the top few. I did that first. It worked well for vague, semantic questions like "tell me about the Cowboys." However, it fell apart on specific ones.
+
+If I were to ask "when do the Cowboys play the Eagles?" a dense-only retriever may prefer a document about *Cowboys vs Giants*, because in embedding space a document about "Cowboys vs Giants" and a document about "Cowboys vs Eagles" have very similar meaning. Dense embeddings capture meaning, and their weakness is that they can pass over the exact token you actually cared about.
+
+BM25, the classic keyword-matching algorithm that search engines used for decades, has the opposite issue. It nails exact matches and completely misses synonyms and paraphrases.
+
+Using the two retrievers together greatly improves performance and accuracy.
+
+```python
+def retrieve(self, query, documents, vectors, top_k=5):
+    # Dense scores
+    query_vector = np.array(self._embed_model.encode([query])[0])
+    cosine_scores = _cosine_similarity(np.array(vectors), query_vector)
+
+    # Sparse scores
+    if self._bm25 is not None:
+        bm25_scores = np.array(self._bm25.get_scores(query.lower().split()))
+
+        def normalize(s):
+            r = s.max() - s.min()
+            return (s - s.min()) / (r if r > 0 else 1)
+
+        fused = 0.5 * normalize(cosine_scores) + 0.5 * normalize(bm25_scores)
+    else:
+        fused = cosine_scores  # fall back to pure vector search
+
+    top_indices = np.argsort(fused)[::-1][:top_k]
+    return [documents[i] for i in top_indices]
+```
+
+Here is what the sparse half actually scores on my real corpus. Click through the three modes. The third is a fix I only found while writing this post, and I'll come back to it below.
+
+<Bm25ScoreExplorer />
+
+*Real BM25 output against all 48 documents. The correct answer for "when do the Cowboys play the Eagles?" is the September 4 game.*
+
+**The normalization is doing more work than it looks like.** Cosine similarity lives roughly in the range 0 to 1. BM25 scores are unbounded and routinely hit 20 or 30. If you add them together raw, you end up with a BM25 retriever that has a small amount of cosine-shaped noise added to it. Min-max normalizing each score array into `[0, 1]` before fusing is what makes the 50/50 weight actually mean 50/50.
+
+**Why 50/50?** Because I tried a handful of splits and this one behaved best on the questions we cared about. There's a more principled technique called Reciprocal Rank Fusion that I'd like to try next, but for 48 documents a weighted average was defensible and I could reason about what it was doing.
+
+---
+
+## Step 5: Reranking
+
+After fusion I have a top 10. That's better than a top 10 from either signal alone, but those scores came from a **bi-encoder**: the model produced one vector for the query and one vector for each document, entirely independently, and then we compared them. That independence is what makes it fast enough to run against a whole corpus, and it's also what makes it imprecise. The document's vector was computed without ever having seen the query.
+
+A **cross-encoder** takes the query and one document *together* as a single input and scores that pair jointly. It's dramatically more accurate and dramatically slower, because you have to run the model once per pair instead of reusing precomputed vectors.
+
+It's far too slow to run against every document, but fine to run against 10.
+
+```python
+def rerank(self, query: str, documents: list[str], top_k: int = 5) -> list[str]:
+    pairs = [(query, doc) for doc in documents]
+    scores = self._reranker.predict(pairs)
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    return [documents[i] for i in top_indices]
+```
+
+<RerankFunnelDiagram />
+
+*48 documents in, 10 survive hybrid retrieval, 5 reach the model.*
+
+This two-stage shape, something cheap that runs over everything followed by something expensive that runs over the survivors, is one of the most common patterns in production search. It's the same structure as a candidate generator feeding a ranker in a recommender system. I obviously didn't invent it, but implementing it myself is what made me actually understand why it exists.
+
+---
+
+## Step 6: Query Rewriting
+
+There's one more stage that sits *before* retrieval.
+
+People ask questions conversationally. "Who do the Cowboys play this week?" is a perfectly clear question for a human and a mediocre search query. So before retrieving anything, I send the question to Gemini and ask it to rewrite it into something keyword-dense.
+
+The rewrite prompt is loaded from a plain text file rather than hardcoded, so it can be tuned per dataset without touching Python. The NFL version includes rules like expanding nicknames to full team names and making implicit dates explicit. This step allows us to answer more ambigous questions like "When do the Cowboys play this week?" or "Who plays the Eagles on September 4?" without having to write a more complex retriever.
+
+It also includes this rule, which I want to flag rather than quietly celebrate:
+
+```
+- Make your best effort to pick out specific teams and dates that could fit
+  the user's question (e.g. "Blue Star Team" → "Dallas Cowboys")
+- Make your best guess to fit a team to the user's requests and profile.
+  (e.g. Lives in Texas → "Dallas Cowboys")
+```
+
+This stage is doing more than polish. If you look back at the first mode in the retrieval widget above, the raw user question scores **zero against all 48 documents**. The database stores city names, so the corpus contains `Dallas` and `Philadelphia` and never the words "Cowboys" or "Eagles." Without the rewrite expanding nicknames into cities, the entire sparse half of my hybrid retriever contributes nothing at all.
+
+That second rule improves retrieval for the user. It also means the system is using keywords provided by the user to give better reccomendations. You can ask the model to reccomend an NFL game as a fan in Texas, the rewriter will know to ask for the Cowboys or the Texans. The rewriting step helps improve accuracy but also allows those without much knowledge of the database to get better answers.
+
+I pass both versions of the question through to the final prompt so the model retrieves on the rewritten query but can answer with the context of the question that was actually asked:
+
+```python
+prompt_question = ("Original question: " + question +
+                   "\nRewritten query: " + rewritten)
+```
+
+---
+
+## Step 7: The Service Layer
+
+The FastAPI app is deliberately boring. All of the heavy lifting happens once, at startup, inside a `lifespan` context manager:
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    collection = os.getenv("FIRESTORE_COLLECTION", "game")
+
+    template_path = Path(__file__).parent / "nfl_query_rewrite.txt"
+    template = str(template_path) if template_path.is_file() else None
+
+    agent = get_agent(query_rewrite_template=template)
+
+    docs    = await asyncio.to_thread(load_documents, collection)
+    texts   = [d.text for d in docs]
+    vectors = await asyncio.to_thread(load_or_embed, agent, texts)
+
+    app.state.agent   = agent
+    app.state.docs    = texts
+    app.state.vectors = vectors
+
+    yield
+```
+
+The agent is a module-level singleton behind `get_agent()`. Loading SentenceTransformer and CrossEncoder takes several seconds, and constructing a new agent per request would make every user pay that cost. Loading them at startup means the first real request is already fast.
+
+The documents and vectors live on `app.state` rather than inside the agent, and get passed into `answer()` on each call. I like this more than I expected to. The agent ends up stateless with respect to the corpus, so nothing about it assumes there's only ever one dataset.
+
+Then there are exactly two endpoints, and the interesting one is four lines:
+
+```python
+@app.post("/chat", response_model=ChatResponse, tags=["Chat"])
+async def chat(body: ChatRequest, request: Request):
+    answer, sources = await request.app.state.agent.answer(
+        body.question,
+        request.app.state.docs,
+        request.app.state.vectors,
+    )
+    return ChatResponse(answer=answer)
+```
+
+That's the entire function me and my partners had to build against. One POST, one string in, one string out. Because the interface was that small and settled that early, they built the whole frontend in parallel without ever being blocked on me. I was confused about how we would coordinate building two parts of a system in parallel, and it turned out to be easy. We just had to agree on the request and response shape in advance and everything fit perfectly when we integrated.
+
+---
+
+## What Broke Along the Way
+
+The version above works. Several versions before it did not, and most of them failed in a frustratingly silent manner.
+
+### Sync calls inside an async endpoint
+
+When I first wired up FastAPI, I called Gemini directly inside the async handler. Under any concurrency at all, the server would freeze solid for seconds at a time, and not just for one user but for *all* of them. The event loop was sitting there waiting on a network response, unable to do anything else.
+
+The Gemini SDK, SentenceTransformer, and CrossEncoder are all synchronous. There are four blocking calls in `answer()`, and every one of them now gets pushed onto a thread pool:
+
+```python
+rewritten  = await self.rewrite_query(question)
+candidates = await asyncio.to_thread(self.retrieve, rewritten, documents, vectors, 10)
+relevant   = await asyncio.to_thread(self.rerank, rewritten, candidates, 5)
+result     = await asyncio.to_thread(
+    self._client.models.generate_content, model=_GEMINI_MODEL, contents=prompt
+)
+```
+
+`async def` on a function that then blocks isn't actually asynchronous, and it's worse than plain synchronous code because it looks correct.
+
+### A comma that broke half my retriever
+
+This is the one I found while writing this post, and it's the best example of the pattern I have.
+
+My documents are serialized as `"day: Thursday, date: September 4, away: Dallas, home: Philadelphia"`. My BM25 index is built by splitting on whitespace:
+
+```python
+tokenized = [t.lower().split() for t in texts]
+```
+
+Splitting that document on whitespace produces this:
+
+```python
+['day:', 'thursday,', 'date:', 'september', '4,', 'away:', 'dallas,', 'home:', 'philadelphia']
+```
+
+Every token carries the punctuation that followed it. `dallas,` with a comma is a completely different string from `dallas`, so a query containing "dallas" **cannot match a document where Dallas is the away team.** It can only match a document where Dallas happens to be the home team, because that's the last field and has no trailing comma.
+
+The measured effect on the query in the widget above: only 3 of 48 documents scored above zero, and the top-ranked result was the wrong game, a September 14 matchup that merely has Dallas at home. The correct September 4 game came second, and it only scored at all because *Philadelphia* was its final field.
+
+The fix is one line:
+
+```python
+tokenized = [re.findall(r"[a-z0-9]+", t.lower()) for t in texts]
+```
+
+With that, the correct game moves to first with nearly double the score (5.761 vs 3.020), and all 48 documents participate in ranking instead of 3.
+
+What makes this my favorite bug is that nothing was ever visibly broken. The cross-encoder reranker sits downstream and is good enough that it often reordered the top 10 into something sensible anyway. So the system produced good answers, most of the time, while one of its two retrieval signals was operating at a fraction of its capability. I had no eval harness, so I had no way to see it. I found it by printing scores for a blog post.
+
+### A prompt path that silently didn't load
+
+This one survived in the codebase until the day I wrote this post, and it's a close second for my favorite bug because of how quiet it was.
+
+The custom answer prompt was loaded like this, at import time:
+
+```python
+_CUSTOM_PROMPT_PATH = "./custom_prompt.txt"
+
+if os.path.exists(_CUSTOM_PROMPT_PATH):
+    ...
+else:
+    _RAG_PROMPT_TEMPLATE = """..."""  # generic fallback
+```
+
+That's a relative path, so it resolves against whatever directory you happened to launch uvicorn from. Start the server from `backend/` and you get the carefully tuned NFL prompt, the one with the formatting rules and the instruction to list *all* of Sunday's games instead of just one. Start it from the repository root and `os.path.exists` returns `False`, you silently get the generic fallback, and the only symptom is that answers are a bit worse than they were yesterday.
+
+There was no error and no warning, just quietly degraded output. The query rewrite template in `main.py` had already been fixed to anchor against `Path(__file__).parent`; this one hadn't. It now does, and the fallback branch logs a warning instead of saying nothing:
+
+```python
+_CUSTOM_PROMPT_PATH = Path(__file__).parent / "custom_prompt.txt"
+
+if _CUSTOM_PROMPT_PATH.is_file():
+    _RAG_PROMPT_TEMPLATE = _CUSTOM_PROMPT_PATH.read_text()
+else:
+    _log.warning("custom_prompt.txt not found at %s — falling back to the "
+                 "generic prompt template.", _CUSTOM_PROMPT_PATH)
+```
+
+That logging call is deliberately not `warnings.warn`, because of a lazy `warnings.filterwarnings("ignore")` I implemented near the top of the same file that would have swallowed it. The silent fallback was way worse than a crash, because at least a crash tells you where to look.
+
+---
+
+## Honest Limitations
+
+Things this system does badly, that I'd want fixed before real users touched it.
+
+**There's no chunking strategy.** One Firestore row equals one document. That's fine for schedule rows that are twenty words long. Point this at articles, PDFs, or meeting transcripts and it starts to struggle, because a single "document" won't fit sensibly in a prompt and there's no logic to split long text into overlapping chunks.
+
+**The cache is one JSON file.** At 48 documents this is completely fine. At 48,000 it is not, because the whole thing is read into memory and every vector is compared on every query. A real system uses FAISS or pgvector and stops doing linear scans.
+
+**The corpus had no team nicknames, and two teams named "New York."** My scraper took ESPN's city labels, so `New York` appears for both the Giants and the Jets, and `Los Angeles` for both the Rams and the Chargers. There was no way to answer a question about the Jets specifically with this data. That's a scraper bug that propagated all the way to the top of the stack, which is a good argument for looking at your data before you build three layers on top of it.
+
+---
+
+## Next Steps
+
+**An eval set, before anything else.** Everything below is guesswork until I can measure whether a change helped, and the tokenizer bug is proof of what guesswork costs.
+
+**Streaming responses.** Gemini supports streaming and FastAPI has `StreamingResponse`. Right now the user watches a spinner for a couple of seconds while the full answer generates. Tokens appearing as they're produced would make the thing feel twice as fast without being any faster.
+
+**A real vector store.** FAISS or pgvector, so the index isn't bounded by what fits in a JSON file.
+
+**Reciprocal Rank Fusion**, to replace the weighted average with something I can justify from more than experimentation.
+
+---
+
+## Takeaways as a Backend Developer
+
+A few things I'd tell myself at the start of this.
+
+*The hard part of RAG is not the LLM call.* The generation step is one API call and a format string. Every meaningful quality improvement I made came from the retriever: adding BM25, normalizing before fusing, adding the reranker. Once I internalized that, I stopped fiddling with prompt wording and started fixing search, and the answers got noticeably better.
+
+*Domain knowledge beat model size.* The reason I knew to reach for BM25 was that I'd seen dense retrieval miss exact matches before. If I'd responded to the same symptom by swapping in a bigger embedding model, the bug would still be sitting there, because it was never a capacity problem. Knowing what kind of problem you have tells you which tool to pick up.
+
+*The bugs that cost me the most time never threw an exception.* The mtime cache, the blocking calls in async handlers, the prompt path that resolved against the wrong directory, the dropped sources field, the commas in the BM25 index. Every one of them ran to completion and returned something plausible. I had to look deeper into the results that were coming back to find them. I should have been printing scores and inspecting the retrieval results from the start, but I wasn't. I was too busy looking at the final answer and assuming that if it looked good, it was good.
+
+*Write-ups find bugs.* I found the tokenizer bug because I wanted a chart for this post and had to print real numbers to make one. Explaining a system forces you to check whether it does what you've been saying it does. I'd been describing my retriever as hybrid for months while half of it was barely functioning.
+
+*Boring engineering is most of the work.* The content hash, the `to_thread` wrappers, the singleton agent, the lifespan hook. None of these are clever. Each one fixed a real bug or removed real latency. Lots of our code worked in a controlled demo environment but failed in production. The principles I learned in Secure Software Engineering really paid off in improving the reliability of our system.
+
+*A small interface is a force multiplier.* One endpoint, one field in, one field out, agreed on early. My partners never waited on me and I never waited on them. On a team project with a hard deadline, that mattered a lot.
+
+---
+
+Thanks for reading. I'm planning to keep working on this one. The eval harness, streaming, and actually returning those sources are the top three on my list. If you're building something similar, or you have any recommendations, I'd like to hear about it!
+
+<Signature>
+
+Sean Aidan O&apos;Toole
+
+5/20/2026
+
+</Signature>
+
+Source: <a href="https://github.com/BillShields511/utsa-gpt-api" target="_blank">Project</a>
