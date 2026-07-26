@@ -51,14 +51,27 @@ export default function ResumePage() {
       <div className="space-y-10 mt-8">
         <div>
           <h2 className="text-lg font-semibold mb-2">Education</h2>
-          <p className="font-medium">University of Texas at San Antonio</p>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Bachelor of Science in Computer Science, Minor in Mathematics
-          </p>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Concentration in Data Science and Software Engineering | Aug 2022 -
-            May 2026 | GPA: 3.90
-          </p>
+          <div className="space-y-4">
+            <div>
+              <p className="font-medium">IE University</p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Master in Business Analytics and Data Science
+              </p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Madrid, Spain | Sept 2026 - Jul 2027
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">University of Texas at San Antonio</p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Bachelor of Science in Computer Science, Minor in Mathematics
+              </p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Concentration in Data Science and Software Engineering | Aug 2022
+                - May 2026 | GPA: 3.90
+              </p>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -159,6 +172,42 @@ export default function ResumePage() {
         <div>
           <h2 className="text-lg font-semibold mb-2">Projects</h2>
           <ul className="space-y-6">
+            <li>
+              <p className="font-medium">
+                UTSA GPT{' '}
+                <a
+                  className="text-sm font-normal underline underline-offset-4 text-neutral-600 dark:text-neutral-400"
+                  href="/blog/rag-chatbot"
+                >
+                  (write-up)
+                </a>
+              </p>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Python, FastAPI, RAG, Gemini, Firestore, sentence-transformers
+              </p>
+              <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
+                <li>
+                  Owned the Python backend for a Retrieval-Augmented Generation
+                  chatbot that grounds Gemini on private Firestore collections,
+                  served behind a single async FastAPI endpoint.
+                </li>
+                <li>
+                  Built hybrid retrieval fusing dense sentence-transformer
+                  embeddings with BM25 keyword scoring, then reranked the top 10
+                  candidates through a cross-encoder down to the 5 most relevant.
+                </li>
+                <li>
+                  Cached document embeddings by SHA-256 content hash and moved
+                  four blocking model calls onto worker threads, removing
+                  event-loop stalls under concurrent requests.
+                </li>
+                <li>
+                  Diagnosed a tokenizer defect that silently disabled sparse
+                  retrieval, lifting ranked corpus coverage from 6% to 100% and
+                  correcting the top-ranked result.
+                </li>
+              </ul>
+            </li>
             <li>
               <p className="font-medium">Fantasy Football Assistant</p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
