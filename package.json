@@ -4,6 +4,7 @@
     "dev": "next dev",
     "prebuild": "node scripts/generate-rss.mjs",
     "build": "next build",
+    "postbuild": "node scripts/fix-og-images.mjs",
     "start": "next start"
   },
   "dependencies": {
