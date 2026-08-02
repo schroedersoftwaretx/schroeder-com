@@ -62,8 +62,8 @@ export default function Page() {
           >
             World Cup Fantasy
           </Link>{' '}
-          solo in seven weeks — 53,000 lines of TypeScript over 39 Postgres
-          tables, with 518 tests gated in CI. Before that I owned the Python
+          over the course of seven weeks. 53,000 lines of TypeScript over 39 Postgres
+          tables, with 518 tests gated in CI. Before that I built the Python
           backend for{' '}
           <Link
             className="underline underline-offset-4 hover:text-neutral-900 dark:hover:text-neutral-100"
@@ -76,8 +76,7 @@ export default function Page() {
         </p>
         <p>
           I write here about the parts of a project that don&apos;t fit on a
-          resume — why a design decision was made, and the bugs that failed
-          quietly instead of loudly.
+          resume. Speaking about my decision process and what I learned along the way.
         </p>
         <p className="text-neutral-600 dark:text-neutral-400">
           I&apos;m looking for full-time software and data roles starting August

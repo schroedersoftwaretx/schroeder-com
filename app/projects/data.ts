@@ -47,7 +47,7 @@ export const projects: Project[] = [
     oneLiner:
       'Hybrid-retrieval RAG backend that grounds Gemini on private Firestore collections, served behind an async FastAPI endpoint.',
     blurb:
-      'A retrieval-augmented chatbot that answers questions from private data instead of from the model’s own training. I owned the Python backend and the RAG implementation; teammates built the ingestion pipeline and the React frontend.',
+      'A retrieval-augmented chatbot that answers questions from private data instead of from the model’s own training. I built the Python backend and the RAG implementation; teammates built the ingestion pipeline and the React frontend.',
     stack: [
       'Python',
       'FastAPI',
@@ -59,7 +59,7 @@ export const projects: Project[] = [
     highlights: [
       'Hybrid retrieval fusing dense sentence-transformer embeddings with BM25 keyword scoring, then reranking the top 10 candidates through a cross-encoder down to the 5 most relevant.',
       'Cached document embeddings by SHA-256 content hash and moved four blocking model calls onto worker threads, removing event-loop stalls under concurrent requests.',
-      'Diagnosed a tokenizer defect that silently disabled sparse retrieval, lifting ranked corpus coverage from 6% to 100% and correcting the top-ranked result.',
+      'Designed the service to be collection-agnostic, holding the corpus on application state rather than inside the agent so nothing in the retrieval path assumes a single dataset — a second Firestore collection of ~1,000 products with 40+ attributes each was added later and ran on the same backend unmodified.',
     ],
     writeup: '/blog/rag-chatbot',
   },

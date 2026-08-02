@@ -1,6 +1,6 @@
 ---
 title: "Building UTSA GPT: Teaching Gemini to Answer From My Data, Not Its Own"
-publishedAt: "2026-05-20"
+publishedAt: "2026-06-20"
 summary: "How I built the backend for a RAG chatbot in my senior design class: Project planning, a Firestore ingest layer, hybrid retrieval with a cross-encoder reranker, and an async FastAPI service. As well as what I learned from a series of quiet bugs."
 ---
 
@@ -349,11 +349,11 @@ tokenized = [re.findall(r"[a-z0-9]+", t.lower()) for t in texts]
 
 With that, the correct game moves to first with nearly double the score (5.761 vs 3.020), and all 48 documents participate in ranking instead of 3.
 
-What makes this my favorite bug is that nothing was ever visibly broken. The cross-encoder reranker sits downstream and is good enough that it often reordered the top 10 into something sensible anyway. So the system produced good answers, most of the time, while one of its two retrieval signals was operating at a fraction of its capability. I had no eval harness, so I had no way to see it. I found it by printing scores for a blog post.
+This was an interesting bug because nothing was ever visibly broken. The cross-encoder reranker sits downstream and is good enough that it often reordered the top 10 into something sensible anyway. So the system produced good answers, most of the time, while one of its two retrieval signals was operating at a fraction of its capability. I had no eval harness, so I had no way to see it. I found it by printing scores for a blog post.
 
 ### A prompt path that silently didn't load
 
-This one survived in the codebase until the day I wrote this post, and it's a close second for my favorite bug because of how quiet it was.
+This issue was similar to my last bug. The prompt template for the RAG step is loaded from a text file, so it can be tuned without touching Python.
 
 The custom answer prompt was loaded like this, at import time:
 
@@ -380,25 +380,23 @@ else:
                  "generic prompt template.", _CUSTOM_PROMPT_PATH)
 ```
 
-That logging call is deliberately not `warnings.warn`, because of a lazy `warnings.filterwarnings("ignore")` I implemented near the top of the same file that would have swallowed it. The silent fallback was way worse than a crash, because at least a crash tells you where to look.
-
 ---
 
 ## Honest Limitations
 
-Things this system does badly, that I'd want fixed before real users touched it.
+Things that this could do better, that I'd want fixed before real users touched it.
 
 **There's no chunking strategy.** One Firestore row equals one document. That's fine for schedule rows that are twenty words long. Point this at articles, PDFs, or meeting transcripts and it starts to struggle, because a single "document" won't fit sensibly in a prompt and there's no logic to split long text into overlapping chunks.
 
 **The cache is one JSON file.** At 48 documents this is completely fine. At 48,000 it is not, because the whole thing is read into memory and every vector is compared on every query. A real system uses FAISS or pgvector and stops doing linear scans.
 
-**The corpus had no team nicknames, and two teams named "New York."** My scraper took ESPN's city labels, so `New York` appears for both the Giants and the Jets, and `Los Angeles` for both the Rams and the Chargers. There was no way to answer a question about the Jets specifically with this data. That's a scraper bug that propagated all the way to the top of the stack, which is a good argument for looking at your data before you build three layers on top of it.
+**It would have been nice to test our chatbot against a larger dataset.** The NFL schedule is small enough that I could eyeball the results and see whether retrieval was working. It was also small enough that I could run the whole thing on CPU. A larger dataset would have been more realistic, and it would have been nice to see how the system performed under load. Our second dataset, the Best Buy computer database, was larger but still small enough to run on CPU. I would have liked to see how the system performed with a few hundred thousand documents, and whether retrieval quality held up.
 
 ---
 
 ## Next Steps
 
-**An eval set, before anything else.** Everything below is guesswork until I can measure whether a change helped, and the tokenizer bug is proof of what guesswork costs.
+**An eval set, before anything else.** Everything below is guesswork until I can measure whether a change helped, and the tokenizer bug is proof that eyeballing it isn't enough. I needed a set of questions with known answers, and a way to measure whether the system is returning the right answer.
 
 **Streaming responses.** Gemini supports streaming and FastAPI has `StreamingResponse`. Right now the user watches a spinner for a couple of seconds while the full answer generates. Tokens appearing as they're produced would make the thing feel twice as fast without being any faster.
 
@@ -412,27 +410,23 @@ Things this system does badly, that I'd want fixed before real users touched it.
 
 A few things I'd tell myself at the start of this.
 
-*The hard part of RAG is not the LLM call.* The generation step is one API call and a format string. Every meaningful quality improvement I made came from the retriever: adding BM25, normalizing before fusing, adding the reranker. Once I internalized that, I stopped fiddling with prompt wording and started fixing search, and the answers got noticeably better.
-
-*Domain knowledge beat model size.* The reason I knew to reach for BM25 was that I'd seen dense retrieval miss exact matches before. If I'd responded to the same symptom by swapping in a bigger embedding model, the bug would still be sitting there, because it was never a capacity problem. Knowing what kind of problem you have tells you which tool to pick up.
-
 *The bugs that cost me the most time never threw an exception.* The mtime cache, the blocking calls in async handlers, the prompt path that resolved against the wrong directory, the dropped sources field, the commas in the BM25 index. Every one of them ran to completion and returned something plausible. I had to look deeper into the results that were coming back to find them. I should have been printing scores and inspecting the retrieval results from the start, but I wasn't. I was too busy looking at the final answer and assuming that if it looked good, it was good.
 
-*Write-ups find bugs.* I found the tokenizer bug because I wanted a chart for this post and had to print real numbers to make one. Explaining a system forces you to check whether it does what you've been saying it does. I'd been describing my retriever as hybrid for months while half of it was barely functioning.
+*Write-ups find bugs.* I found the tokenizer bug because I wanted a chart for this post and had to print real numbers to make one. Explaining a system forces you to check whether it does what you've been saying it does. I'd been describing the retriever as hybrid for months while half of it was barely functioning.
 
 *Boring engineering is most of the work.* The content hash, the `to_thread` wrappers, the singleton agent, the lifespan hook. None of these are clever. Each one fixed a real bug or removed real latency. Lots of our code worked in a controlled demo environment but failed in production. The principles I learned in Secure Software Engineering really paid off in improving the reliability of our system.
 
-*A small interface is a force multiplier.* One endpoint, one field in, one field out, agreed on early. My partners never waited on me and I never waited on them. On a team project with a hard deadline, that mattered a lot.
+*A small interface is a force multiplier.* We had one endpoint, one field in, one field out. We made sure that we agreed on the endpoint early. My partners never waited on me and I never waited on them. On a team project with a hard deadline, that mattered a lot.
 
 ---
 
-Thanks for reading. I'm planning to keep working on this one. The eval harness, streaming, and actually returning those sources are the top three on my list. If you're building something similar, or you have any recommendations, I'd like to hear about it!
+Thanks for reading. I hope to keep working on this project in the future. If you're building something similar, or you have any recommendations, I'd like to hear about it!
 
 <Signature>
 
 Sean Aidan O&apos;Toole
 
-5/20/2026
+6/20/2026
 
 </Signature>
 
