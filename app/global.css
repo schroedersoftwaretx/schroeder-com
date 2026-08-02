@@ -6,6 +6,12 @@
 }
 
 :root {
+  /* Comfortable line length for body text (~70 characters at the base size).
+     Deliberately in rem, not ch: `ch` resolves against each element's own
+     font-size, so headings would end up materially wider than the paragraphs
+     they sit above and the column edge would visibly zigzag.
+     Charts and diagrams opt out of this and run the full container width. */
+  --measure: 38rem;
   --sh-class: #2d5e9d;
   --sh-identifier: #354150;
   --sh-sign: #8996a3;
@@ -33,6 +39,38 @@
 
 html {
   min-width: 360px;
+}
+
+/*
+ * Hold body text to a readable measure while leaving figures full width.
+ * Scoped to direct children so that text nested inside a chart wrapper or a
+ * table cell is governed by its own container instead. Charts and diagrams are
+ * all `.not-prose` and are intentionally excluded.
+ */
+.prose > p,
+.prose > ul,
+.prose > ol,
+.prose > blockquote,
+.prose > pre,
+.prose > hr,
+.prose > h1,
+.prose > h2,
+.prose > h3,
+.prose > h4,
+.prose > h5,
+.prose > h6,
+.measure {
+  max-width: var(--measure);
+}
+
+/* Keep a heading off the very top edge when jumped to from the contents list. */
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  scroll-margin-top: 2rem;
 }
 
 .prose .anchor {

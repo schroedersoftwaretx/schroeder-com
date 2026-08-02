@@ -1,3 +1,5 @@
+import { contact } from 'app/site'
+
 function ArrowIcon() {
   return (
     <svg
@@ -35,7 +37,7 @@ export default function Footer() {
             className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
             rel="noopener noreferrer"
             target="_blank"
-            href="https://github.com/schroedersoftwaretx"
+            href={contact.github}
           >
             <ArrowIcon />
             <p className="ml-2 h-7">github</p>
@@ -46,7 +48,7 @@ export default function Footer() {
             className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
             rel="noopener noreferrer"
             target="_blank"
-            href="https://www.linkedin.com/in/seanotoole04/"
+            href={contact.linkedin}
           >
             <ArrowIcon />
             <p className="ml-2 h-7">linkedin</p>
@@ -55,12 +57,10 @@ export default function Footer() {
         <li>
           <a
             className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://github.com/vercel/examples/tree/main/solutions/blog"
+            href={`mailto:${contact.email}`}
           >
             <ArrowIcon />
-            <p className="ml-2 h-7">template</p>
+            <p className="ml-2 h-7">email</p>
           </a>
         </li>
       </ul>

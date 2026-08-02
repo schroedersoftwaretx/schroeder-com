@@ -18,6 +18,14 @@
 # generated at prebuild by scripts/generate-rss.mjs
 /public/rss.xml
 
+# planning docs, project handoffs, career notes — contain personal contact
+# details and project internals; not for a public repo
+/notes/
+
+# LaTeX resume sources — the header carries a phone number, and this repo is
+# public. The rendered PDF in public/ is the intentionally published artifact.
+/resume/
+
 # misc
 .DS_Store
 *.pem
