@@ -8,7 +8,14 @@
  * Facebook, LinkedIn, and X crawlers all reject a non-image Content-Type. The
  * failure is silent — the page still loads, the card just never renders.
  *
- * So after export we rename the files and repoint every reference at them.
+ * So after a static export we rename the files and repoint every reference.
+ *
+ * This only applies to `output: 'export'` builds, which produce `out/`. A
+ * server build produces `.next` instead, and there Next serves the route
+ * itself and sets Content-Type — nothing to fix. In that case this script is
+ * a no-op and must not fail the build. Do not point it at `.next`: those are
+ * server build artifacts addressed through route manifests, not files served
+ * by name, and renaming them would break the build.
  */
 import fs from 'fs'
 import path from 'path'
@@ -21,9 +28,15 @@ const IMAGE_BASENAME = 'opengraph-image'
 /** Files that can carry a URL reference to the image. */
 const REWRITABLE = new Set(['.html', '.txt', '.json', '.js'])
 
+// No out/ means this was a server build, not a static export. Skip cleanly:
+// failing here would break the build on any host that runs `next build` and
+// `next start`, which is what production currently does.
 if (!fs.existsSync(outDir)) {
-  console.error(`fix-og-images: no ${outDir} directory — run the build first.`)
-  process.exit(1)
+  console.log(
+    'fix-og-images: no out/ directory, so this was a server build — skipping ' +
+      '(Next serves the opengraph-image route and sets Content-Type itself).'
+  )
+  process.exit(0)
 }
 
 function walk(dir) {
