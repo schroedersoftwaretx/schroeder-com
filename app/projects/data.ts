@@ -47,7 +47,7 @@ export const projects: Project[] = [
     oneLiner:
       'Hybrid-retrieval RAG backend that grounds Gemini on private Firestore collections, served behind an async FastAPI endpoint.',
     blurb:
-      'A retrieval-augmented chatbot that answers questions from private data instead of from the model’s own training. I owned the Python backend and the RAG implementation; teammates built the ingestion pipeline and the React frontend.',
+      'A retrieval-augmented chatbot that answers questions from private data instead of from the model’s own training. I built the Python backend and the RAG implementation; teammates built the ingestion pipeline and the React frontend.',
     stack: [
       'Python',
       'FastAPI',

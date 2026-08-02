@@ -30,6 +30,8 @@
 .DS_Store
 *.pem
 .vscode
+.idea
+.claude
 
 # debug
 npm-debug.log*
