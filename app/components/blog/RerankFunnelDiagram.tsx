@@ -28,7 +28,7 @@ const TIERS: Tier[] = [
     count: 5,
     title: 'Cross-encoder rerank',
     model: 'ms-marco-MiniLM-L-6-v2',
-    note: 'Scores the query and each document together as one input. Far more accurate, far too slow for 48 — fine for 10.',
+    note: 'Scores the query and each document together as one input. Far more accurate, far slower but fine for 10.',
     width: 32,
     bar: 'bg-emerald-500 dark:bg-emerald-600',
   },
@@ -74,8 +74,7 @@ export default function RerankFunnelDiagram() {
       </div>
 
       <p className="mt-5 border-t border-neutral-200 pt-3 text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-        Cheap over everything, expensive over the survivors — the same shape as a
-        candidate generator feeding a ranker.
+        Cheap over everything, expensive over the survivors.
       </p>
     </figure>
   )
