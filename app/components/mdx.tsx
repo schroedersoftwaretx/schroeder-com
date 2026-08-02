@@ -4,6 +4,7 @@ import { MDXRemote } from 'next-mdx-remote/rsc'
 import { highlight } from 'sugar-high'
 import React from 'react'
 import remarkGfm from 'remark-gfm'
+import { slugify } from 'app/blog/text'
 import {
   FantasyIsotonicRegressionChart,
   FantasyLinearRegressionChart,
@@ -18,7 +19,12 @@ import UtsaGptPipelineDiagram from 'app/components/blog/UtsaGptPipelineDiagram'
 import Bm25ScoreExplorer from 'app/components/blog/Bm25ScoreExplorer'
 import RerankFunnelDiagram from 'app/components/blog/RerankFunnelDiagram'
 
-function Table({ data }) {
+type TableData = {
+  headers: React.ReactNode[]
+  rows: React.ReactNode[][]
+}
+
+function Table({ data }: { data: TableData }) {
   let headers = data.headers.map((header, index) => (
     <th key={index}>{header}</th>
   ))
@@ -40,7 +46,7 @@ function Table({ data }) {
   )
 }
 
-function CustomLink(props) {
+function CustomLink(props: React.ComponentPropsWithoutRef<'a'>) {
   let href = props.href
 
   // An <a> written as raw JSX in MDX arrives here with no href at all, which
@@ -65,11 +71,20 @@ function CustomLink(props) {
   return <a target="_blank" rel="noopener noreferrer" {...props} />
 }
 
-function RoundedImage(props) {
-  return <Image alt={props.alt} className="rounded-lg" {...props} />
+function RoundedImage(props: React.ComponentProps<typeof Image>) {
+  return <Image {...props} alt={props.alt} className="rounded-lg" />
 }
 
-function Code({ children, ...props }) {
+function Code({
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<'code'>) {
+  // sugar-high only accepts a string; anything else in a code fence is a bug
+  // upstream, so render it untouched rather than throwing mid-page.
+  if (typeof children !== 'string') {
+    return <code {...props}>{children}</code>
+  }
+
   let codeHTML = highlight(children)
   return <code dangerouslySetInnerHTML={{ __html: codeHTML }} {...props} />
 }
@@ -90,20 +105,9 @@ function childrenToText(node: React.ReactNode): string {
   return ''
 }
 
-function slugify(str) {
-  return str
-    .toString()
-    .toLowerCase()
-    .trim() // Remove whitespace from both ends of a string
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/&/g, '-and-') // Replace & with 'and'
-    .replace(/[^\w\-]+/g, '') // Remove all non-word characters except for -
-    .replace(/\-\-+/g, '-') // Replace multiple - with single -
-}
-
 function Lead({ children }: { children: React.ReactNode }) {
   return (
-    <div className="not-prose my-8 first:mt-0 [&_p]:text-lg [&_p]:leading-relaxed [&_p]:text-neutral-700 dark:[&_p]:text-neutral-200 [&_p]:font-medium">
+    <div className="measure not-prose my-8 first:mt-0 [&_p]:text-lg [&_p]:leading-relaxed [&_p]:text-neutral-700 dark:[&_p]:text-neutral-200 [&_p]:font-medium">
       {children}
     </div>
   )
@@ -117,7 +121,7 @@ function Callout({
   children: React.ReactNode
 }) {
   return (
-    <aside className="not-prose my-8 rounded-xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-neutral-50 p-5 shadow-sm dark:border-sky-900/50 dark:from-sky-950/40 dark:via-neutral-950 dark:to-neutral-950">
+    <aside className="measure not-prose my-8 rounded-xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-white to-neutral-50 p-5 shadow-sm dark:border-sky-900/50 dark:from-sky-950/40 dark:via-neutral-950 dark:to-neutral-950">
       {title ? (
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-800 dark:text-sky-300">
           {title}
@@ -132,15 +136,16 @@ function Callout({
 
 function Signature({ children }: { children: React.ReactNode }) {
   return (
-    <div className="not-prose mt-14 border-t border-neutral-200 pt-8 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+    <div className="measure not-prose mt-14 border-t border-neutral-200 pt-8 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
       {children}
     </div>
   )
 }
 
-function createHeading(level) {
-  const Heading = ({ children }) => {
-    let slug = slugify(childrenToText(children))
+function createHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
+  const Heading = ({ children }: { children?: React.ReactNode }) => {
+    const text = childrenToText(children)
+    const slug = slugify(text)
     return React.createElement(
       `h${level}`,
       { id: slug },
@@ -149,6 +154,9 @@ function createHeading(level) {
           href: `#${slug}`,
           key: `link-${slug}`,
           className: 'anchor',
+          // The visible "#" is a CSS ::after, so the link has no text of its
+          // own. Name it explicitly for anything that does surface it.
+          'aria-label': `Link to section: ${text}`,
         }),
       ],
       children
@@ -187,7 +195,7 @@ let components = {
   RerankFunnelDiagram,
 }
 
-export function CustomMDX(props) {
+export function CustomMDX(props: React.ComponentProps<typeof MDXRemote>) {
   const { options: userOptions, components: userComponents, ...rest } = props
   const userMdx = userOptions?.mdxOptions ?? {}
   const userRemark = Array.isArray(userMdx.remarkPlugins)
