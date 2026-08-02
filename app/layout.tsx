@@ -51,7 +51,8 @@ export const metadata: Metadata = {
   },
 }
 
-const cx = (...classes) => classes.filter(Boolean).join(' ')
+const cx = (...classes: (string | false | null | undefined)[]) =>
+  classes.filter(Boolean).join(' ')
 
 export default function RootLayout({
   children,
@@ -73,6 +74,17 @@ export default function RootLayout({
           {children}
           <Footer />
         </main>
+        {/*
+          GoatCounter: cookieless and stores no personal data, so it needs no
+          consent banner — which matters once this is being read from the EU.
+          Plain <script> rather than next/script so it survives a failed JS
+          bundle and stays byte-identical to GoatCounter's documented snippet.
+        */}
+        <script
+          data-goatcounter="https://schroedersoftware.goatcounter.com/count"
+          async
+          src="https://gc.zgo.at/count.js"
+        />
       </body>
     </html>
   )

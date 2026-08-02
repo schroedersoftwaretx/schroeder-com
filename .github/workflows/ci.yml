@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Lets you re-run the build by hand after changing a post, without a commit.
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # --frozen-lockfile fails the run if package.json and the lockfile have
+      # drifted, rather than silently resolving something else than local.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      # Also the guard on post content: app/blog/utils.ts throws on malformed
+      # frontmatter, so a bad post fails here instead of at deploy time.
+      - name: Build
+        run: pnpm build
+
+      - name: Upload static site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: out/
+          retention-days: 7
