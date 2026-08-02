@@ -4,6 +4,13 @@ export const siteName = "Sean Aidan O'Toole"
 export const siteDescription =
   'Software engineer and data scientist — portfolio, blog, and resume.'
 
+/** Single source of truth for contact links. Used by the home page, footer, and resume. */
+export const contact = {
+  email: 'SchroederSoftwareTX@gmail.com',
+  github: 'https://github.com/schroedersoftwaretx',
+  linkedin: 'https://www.linkedin.com/in/seanotoole04/',
+} as const
+
 /** Default social card, served from public/. Used when a post has no `image` in its frontmatter. */
 export const defaultOgImage = '/og.png'
 

@@ -1,4 +1,6 @@
-import { siteName } from 'app/site'
+import Link from 'next/link'
+import { contact, siteName } from 'app/site'
+import { projects } from 'app/projects/data'
 
 export const metadata = {
   title: 'Resume',
@@ -11,18 +13,19 @@ export default function ResumePage() {
       <h1 className="font-semibold text-2xl tracking-tighter">
         Sean Aidan O&apos;Toole
       </h1>
+      {/* Phone deliberately omitted here — a public HTML page gets harvested by
+          scrapers. It stays on the PDF, which is what recruiters actually keep. */}
       <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
-        858-263-5881 |{' '}
         <a
           className="underline underline-offset-4"
-          href="mailto:SchroederSoftwareTX@gmail.com"
+          href={`mailto:${contact.email}`}
         >
-          SchroederSoftwareTX@gmail.com
+          {contact.email}
         </a>{' '}
         |{' '}
         <a
           className="underline underline-offset-4"
-          href="https://linkedin.com/in/seanotoole04"
+          href={contact.linkedin}
           target="_blank"
           rel="noreferrer"
         >
@@ -31,7 +34,7 @@ export default function ResumePage() {
         |{' '}
         <a
           className="underline underline-offset-4"
-          href="https://github.com/schroedersoftwaretx"
+          href={contact.github}
           target="_blank"
           rel="noreferrer"
         >
@@ -58,17 +61,17 @@ export default function ResumePage() {
                 Master in Business Analytics and Data Science
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Madrid, Spain | Sept 2026 - Jul 2027
+                Madrid, Spain | Sept 2026 - Jul 2027 (expected)
               </p>
             </div>
             <div>
               <p className="font-medium">University of Texas at San Antonio</p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Bachelor of Science in Computer Science, Minor in Mathematics
+                B.S. Computer Science, Minor in Mathematics — Honors College
               </p>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Concentration in Data Science and Software Engineering | Aug 2022
-                - May 2026 | GPA: 3.90
+                - May 2026 | GPA: 3.90/4.00
               </p>
             </div>
           </div>
@@ -78,21 +81,34 @@ export default function ResumePage() {
           <h2 className="text-lg font-semibold mb-2">Skills</h2>
           <div className="space-y-2 text-neutral-700 dark:text-neutral-300">
             <p>
-              <span className="font-medium">Languages:</span> Java, Python, C,
-              SQL, JavaScript, PHP, HTML/CSS, R, BASIC, Bash, Kotlin
+              <span className="font-medium">Languages:</span> Python, SQL,
+              TypeScript, R, Java, PHP, C
             </p>
             <p>
-              <span className="font-medium">Developer Tools:</span> AWS, Git,
-              Android Studio
+              <span className="font-medium">ML &amp; Statistics:</span>{' '}
+              scikit-learn, pandas, NumPy, scipy, isotonic regression,
+              clustering, Monte Carlo, backtesting, RAG, LLMs
             </p>
             <p>
-              <span className="font-medium">Libraries:</span> TensorFlow,
-              scikit-learn, Matplotlib
+              <span className="font-medium">Data Engineering:</span> ETL design,
+              PostgreSQL, MySQL, SQLite, Parquet, schema normalization, entity
+              resolution, AWS
             </p>
             <p>
-              <span className="font-medium">Other:</span> German
-              (Intermediate), Spanish (Elementary), Adobe Photoshop and Premiere
-              Pro (2000+ hours)
+              <span className="font-medium">Web &amp; Frameworks:</span>{' '}
+              Next.js, React, Node.js, FastAPI, Drizzle ORM, Nginx
+            </p>
+            <p>
+              <span className="font-medium">Testing &amp; CI:</span> Vitest,
+              Testcontainers, Testing Library, GitHub Actions
+            </p>
+            <p>
+              <span className="font-medium">Tools:</span> Git, Linux, Docker,
+              Jupyter, Matplotlib
+            </p>
+            <p>
+              <span className="font-medium">Languages (spoken):</span> German
+              (Intermediate), Spanish (Elementary)
             </p>
           </div>
         </div>
@@ -107,16 +123,18 @@ export default function ResumePage() {
               </p>
               <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
                 <li>
-                  Designed and maintained relational and cloud-hosted databases
-                  (PostgreSQL, MySQL, Firebase Firestore).
+                  Designed and maintained production PostgreSQL, MySQL, and
+                  Firebase Firestore systems supporting customer-facing
+                  applications.
                 </li>
                 <li>
-                  Implemented efficient schema structures and data models for
-                  frontend integration and future scaling.
+                  Implemented normalized schema structures and data models to
+                  support frontend integration and scalability for future
+                  feature expansion.
                 </li>
                 <li>
-                  Optimized queries and data retrieval processes to reduce
-                  latency and improve user experience.
+                  Optimized SQL queries, indexing strategies, and schema design
+                  to reduce latency and improve application responsiveness.
                 </li>
               </ul>
             </li>
@@ -130,16 +148,18 @@ export default function ResumePage() {
               </p>
               <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
                 <li>
-                  Utilized Llama to create automated feedback loops for software
-                  development tasks.
+                  Built automated feedback loops using Llama-based LLM systems
+                  to evaluate and improve software development task output.
                 </li>
                 <li>
-                  Analyzed and categorized GitHub change requests, contributing
-                  to a 60% increase in model accuracy for developer feedback.
+                  Developed Python data pipelines with BeautifulSoup to collect,
+                  clean, and process GitHub repository change requests and
+                  review comments at scale.
                 </li>
                 <li>
-                  Developed scripts with BeautifulSoup to extract user comments
-                  and change requests from GitHub repositories.
+                  Improved model accuracy 60% through iterative experimentation,
+                  prompt refinement, and feature engineering on
+                  developer-feedback classification.
                 </li>
               </ul>
             </li>
@@ -153,16 +173,18 @@ export default function ResumePage() {
               </p>
               <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
                 <li>
-                  Led the Four-Year Plan Committee and initiatives impacting
-                  2,000+ students.
+                  Partnered with College of Sciences leadership to analyze
+                  student outcome data, translating trends into actionable
+                  strategies for improving engagement and retention.
+                </li>
+                <li>
+                  Led the Four-Year Plan Committee, coordinating
+                  career-readiness initiatives serving 2,000+ students across
+                  timelines, budget, and resources.
                 </li>
                 <li>
                   Collaborated across departments to host events promoting
                   academic growth and career awareness.
-                </li>
-                <li>
-                  Worked with leadership to analyze data trends and improve
-                  student engagement, retention, and graduation rates.
                 </li>
               </ul>
             </li>
@@ -171,87 +193,41 @@ export default function ResumePage() {
 
         <div>
           <h2 className="text-lg font-semibold mb-2">Projects</h2>
-          <ul className="space-y-6">
-            <li>
-              <p className="font-medium">
-                UTSA GPT{' '}
-                <a
-                  className="text-sm font-normal underline underline-offset-4 text-neutral-600 dark:text-neutral-400"
-                  href="/blog/rag-chatbot"
-                >
-                  (write-up)
-                </a>
-              </p>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Python, FastAPI, RAG, Gemini, Firestore, sentence-transformers
-              </p>
-              <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
-                <li>
-                  Owned the Python backend for a Retrieval-Augmented Generation
-                  chatbot that grounds Gemini on private Firestore collections,
-                  served behind a single async FastAPI endpoint.
-                </li>
-                <li>
-                  Built hybrid retrieval fusing dense sentence-transformer
-                  embeddings with BM25 keyword scoring, then reranked the top 10
-                  candidates through a cross-encoder down to the 5 most relevant.
-                </li>
-                <li>
-                  Cached document embeddings by SHA-256 content hash and moved
-                  four blocking model calls onto worker threads, removing
-                  event-loop stalls under concurrent requests.
-                </li>
-                <li>
-                  Diagnosed a tokenizer defect that silently disabled sparse
-                  retrieval, lifting ranked corpus coverage from 6% to 100% and
-                  correcting the top-ranked result.
-                </li>
-              </ul>
-            </li>
-            <li>
-              <p className="font-medium">Fantasy Football Assistant</p>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Python, scikit-learn
-              </p>
-              <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
-                <li>
-                  Developed a data-driven fantasy football program to identify
-                  undervalued players and improve draft decisions.
-                </li>
-                <li>
-                  Designed draft strategy and team composition algorithms with
-                  statistical backtesting.
-                </li>
-                <li>
-                  Used PCA and LDA for dimensionality reduction, model
-                  optimization, and player classification.
-                </li>
-              </ul>
-            </li>
-            <li>
-              <p className="font-medium">
-                High-Volume Data Ingestion and Modeling Pipeline
-              </p>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                AWS, PHP, MySQL
-              </p>
-              <ul className="list-disc pl-6 mt-2 space-y-1 text-neutral-700 dark:text-neutral-300">
-                <li>
-                  Designed and implemented a scalable ETL pipeline to process
-                  and validate 5M+ records with parallel chunking and
-                  multi-process execution.
-                </li>
-                <li>
-                  Built a normalized relational schema with indexed lookup
-                  tables, reducing storage overhead by 90% and improving upload
-                  speed by 400%.
-                </li>
-                <li>
-                  Implemented batch insertion with SQL constraint handling for
-                  duplicate detection and structured error routing.
-                </li>
-              </ul>
-            </li>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+            Summarized here. Each links to a fuller breakdown on the{' '}
+            <Link className="underline underline-offset-4" href="/projects">
+              projects page
+            </Link>
+            .
+          </p>
+          <ul className="space-y-5">
+            {projects.map((project) => (
+              <li key={project.slug}>
+                <p className="font-medium">{project.title}</p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  {project.stack.join(', ')}
+                </p>
+                <p className="mt-1 text-neutral-700 dark:text-neutral-300">
+                  {project.oneLiner}
+                </p>
+                <p className="mt-1 flex flex-wrap gap-x-4 text-sm">
+                  <Link
+                    className="underline underline-offset-4 text-neutral-600 dark:text-neutral-400"
+                    href={`/projects#${project.slug}`}
+                  >
+                    Details
+                  </Link>
+                  {project.writeup ? (
+                    <Link
+                      className="underline underline-offset-4 text-neutral-600 dark:text-neutral-400"
+                      href={project.writeup}
+                    >
+                      Write-up
+                    </Link>
+                  ) : null}
+                </p>
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -264,20 +240,15 @@ export default function ResumePage() {
               (2022-2025)
             </p>
             <p>
-              <span className="font-medium">Certifications:</span> IBM AI
-              Foundations for Business, University of Michigan Generative AI
-              Essentials, Google Data Analytics Professional, Certiport
-              HTML/CSS, Microsoft Fundamentals, Computational Thinking, 652
-              Cyber Security
+              <span className="font-medium">Honors:</span> President&apos;s
+              Scholarship (5x), President&apos;s List (4x), Dean&apos;s List,
+              Dr. Craig Endowed Scholarship in the Sciences, Honors College,
+              Most Outstanding Information Technology Student
             </p>
             <p>
-              <span className="font-medium">Honors:</span> President&apos;s
-              Scholarship (5x), Dr. Craig Endowed Scholarship in the Sciences,
-              Scholarship for Computer Scientists Who Don&apos;t Run Good,
-              President&apos;s List (4x), Dean&apos;s List (1x), Honors College
-              Student, Most Outstanding Information Technology Student, Most
-              Outstanding Business and Administration Student, Distinguished
-              Student Athlete
+              <span className="font-medium">Certifications:</span> Google Data
+              Analytics Professional, IBM AI Foundations for Business,
+              University of Michigan Generative AI Essentials
             </p>
           </div>
         </div>
