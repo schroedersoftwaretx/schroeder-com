@@ -1,7 +1,7 @@
 # schroedersoftware.com
 
 Personal site: portfolio, resume, and blog (Next.js App Router, MDX, Tailwind).
-Based off of a vercel template I found here: https://github.com/vercel/examples/tree/main/solutions/blog
+Originally based on Vercel's [blog starter](https://github.com/vercel/examples/tree/main/solutions/blog).
 
 ## Local development
 
@@ -29,7 +29,7 @@ pnpm build
 
 ## Deployment
 
-> ⚠️ **The repo config and production do not currently agree.** Worth resolving before the next deploy.
+**Known inconsistency:** the repo config and production do not currently agree. Worth resolving before the next deploy.
 
 **What production is actually doing** (observed against `https://schroedersoftware.com`):
 
