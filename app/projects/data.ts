@@ -59,7 +59,7 @@ export const projects: Project[] = [
     highlights: [
       'Hybrid retrieval fusing dense sentence-transformer embeddings with BM25 keyword scoring, then reranking the top 10 candidates through a cross-encoder down to the 5 most relevant.',
       'Cached document embeddings by SHA-256 content hash and moved four blocking model calls onto worker threads, removing event-loop stalls under concurrent requests.',
-      'Designed the service to be collection-agnostic, holding the corpus on application state rather than inside the agent so nothing in the retrieval path assumes a single dataset — a second Firestore collection of ~1,000 products with 40+ attributes each was added later and ran on the same backend unmodified.',
+      'Diagnosed a tokenizer defect that silently disabled sparse retrieval, lifting ranked corpus coverage from 6% to 100% and correcting the top-ranked result.',
     ],
     writeup: '/blog/rag-chatbot',
   },
