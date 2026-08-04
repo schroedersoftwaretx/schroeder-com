@@ -42,8 +42,7 @@ export default function Page() {
       </h1>
 
       <p className="measure text-lg leading-relaxed text-neutral-700 dark:text-neutral-200">
-        I build backend and data systems — retrieval pipelines, ETL, and the
-        models that sit on top of them.
+        I build full-stack applications and run data analysis. I have done work on ETL pipelines, API development, and machine learning.
       </p>
 
       <div className="measure mt-6 space-y-4 text-neutral-700 dark:text-neutral-300">
@@ -62,8 +61,8 @@ export default function Page() {
           >
             World Cup Fantasy
           </Link>{' '}
-          over the course of seven weeks. 53,000 lines of TypeScript over 39 Postgres
-          tables, with 518 tests gated in CI. Before that I built the Python
+          over the course of seven weeks. A fully functioning fantasy soccer platform built on 53,000 line of typescript, 39 Postgres
+          tables, and 518 tests gated in CI. Before that I built the Python
           backend for{' '}
           <Link
             className="underline underline-offset-4 hover:text-neutral-900 dark:hover:text-neutral-100"
